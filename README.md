@@ -11,13 +11,33 @@ MVP goal: a Telegram-like workspace where chats are grouped by company, each com
 - Manager priority: Claudia Ochoa
 - Approval interfaces: Telegram + iMessage
 
+## MVP scope
+
+- Multi-company data model, seeded with Celeritech first.
+- Company profile with CEO, mission, operating notes, and approval rules.
+- Company-scoped chat list with channel/kind metadata.
+- Messages and approval requests scoped to company + chat.
+- Agent structures per company.
+- Visual org chart/structure in SwiftUI.
+- Local-first JSON database codec for now; ready to move to SwiftData.
+- iOS Xcode project generated from `project.yml`.
+
 ## Build
 
 ```bash
 swift test
 swift run HermesPreview
+swift build --product HermesApp
+xcodegen generate
+xcodebuild -project Hermes.xcodeproj -scheme Hermes -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
 ```
+
+## GitHub
+
+Remote: https://github.com/edorfanini00/hermes
 
 ## App Store Connect
 
-App Store submission requires Apple Developer/App Store Connect team access, bundle ID, SKU, signing assets, and app metadata. Those are not committed to this repo.
+Initial App Store app records cannot be created through the official App Store Connect REST API. Apple requires creating the app record in App Store Connect web first; API/CLI automation can continue after that for Bundle IDs, versions, metadata, and uploads once credentials are available.
+
+See `Supporting/README-AppStore.md` for exact required fields and blocker.

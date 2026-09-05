@@ -80,6 +80,9 @@ struct CompanyDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(company.name).font(.largeTitle.bold())
                         Text(company.summary).foregroundStyle(.secondary)
+                        Text("CEO: \(company.profile.ceoName)").font(.headline)
+                        Text(company.profile.operatingNotes).font(.caption).foregroundStyle(.secondary)
+                        Text(company.profile.approvalRules).font(.caption.bold()).foregroundStyle(.blue)
                     }
 
                     AgentBoard(agents: store.agents(for: company.id))

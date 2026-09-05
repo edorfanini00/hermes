@@ -50,3 +50,36 @@ import Testing
     #expect(decoded.chats.count >= 3)
     #expect(decoded.agents.contains { $0.name.contains("Approval") })
 }
+
+@Test func companyProfileCarriesApprovalRulesAndOperatingNotes() throws {
+    let store = CompanyWorkspaceStore.seeded()
+    let company = try #require(store.selectedCompany)
+
+    #expect(company.profile.ceoName == "Edoardo Orfanini")
+    #expect(company.profile.approvalRules.contains("approval"))
+    #expect(company.profile.operatingNotes.contains("Claudia"))
+}
+
+@Test func chatMessagesAndApprovalRequestsAreCompanyScoped() throws {
+    var store = CompanyWorkspaceStore.seeded()
+    let companyID = try #require(store.selectedCompany?.id)
+    let chatID = try #require(store.visibleChats.first?.id)
+
+    let message = store.addMessage(
+        to: chatID,
+        sender: "Claudia Ochoa",
+        body: "Can you check this CRM workflow?",
+        status: .pendingApproval
+    )
+    let approval = store.requestApproval(
+        companyID: companyID,
+        chatID: chatID,
+        title: "CRM workflow question",
+        proposedAction: "Review GoHighLevel workflow and draft Edoardo-style reply."
+    )
+
+    #expect(message.companyID == companyID)
+    #expect(store.messages(for: chatID).contains { $0.body.contains("CRM workflow") })
+    #expect(approval.status == .pending)
+    #expect(store.approvals(for: companyID).contains { $0.id == approval.id })
+}
