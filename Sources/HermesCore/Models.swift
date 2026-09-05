@@ -7,6 +7,7 @@ public struct WorkspaceSnapshot: Codable, Equatable, Sendable {
     public var agents: [CompanyAgent]
     public var approvals: [ApprovalRequest]
     public var selectedCompanyID: UUID?
+    public var selectedChatID: UUID?
 
     public init(
         companies: [Company],
@@ -14,7 +15,8 @@ public struct WorkspaceSnapshot: Codable, Equatable, Sendable {
         messages: [ChatMessage] = [],
         agents: [CompanyAgent],
         approvals: [ApprovalRequest] = [],
-        selectedCompanyID: UUID?
+        selectedCompanyID: UUID?,
+        selectedChatID: UUID? = nil
     ) {
         self.companies = companies
         self.chats = chats
@@ -22,6 +24,7 @@ public struct WorkspaceSnapshot: Codable, Equatable, Sendable {
         self.agents = agents
         self.approvals = approvals
         self.selectedCompanyID = selectedCompanyID
+        self.selectedChatID = selectedChatID
     }
 }
 
@@ -282,6 +285,12 @@ public struct WorkspaceDatabase: Sendable {
         self.url = url
     }
 
+    public static func defaultURL() -> URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Hermes", isDirectory: true)
+            .appendingPathComponent("workspace.json")
+    }
+
     public func save(_ snapshot: WorkspaceSnapshot) throws {
         let data = try Self.encoder.encode(snapshot)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -301,10 +310,16 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
     public private(set) var companyAgents: [CompanyAgent]
     public private(set) var approvalRequests: [ApprovalRequest]
     public private(set) var selectedCompanyID: UUID?
+    public private(set) var selectedChatID: UUID?
 
     public var selectedCompany: Company? {
         guard let selectedCompanyID else { return companies.first }
         return companies.first { $0.id == selectedCompanyID }
+    }
+
+    public var selectedChat: CompanyChat? {
+        guard let selectedChatID else { return nil }
+        return chats.first { $0.id == selectedChatID }
     }
 
     public var visibleChats: [CompanyChat] {
@@ -322,7 +337,8 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         messages: [ChatMessage] = [],
         agents: [CompanyAgent],
         approvals: [ApprovalRequest] = [],
-        selectedCompanyID: UUID?
+        selectedCompanyID: UUID?,
+        selectedChatID: UUID? = nil
     ) {
         self.companies = companies
         self.chats = chats
@@ -330,6 +346,19 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         self.companyAgents = agents
         self.approvalRequests = approvals
         self.selectedCompanyID = selectedCompanyID
+        self.selectedChatID = selectedChatID
+    }
+
+    public init(snapshot: WorkspaceSnapshot) {
+        self.init(
+            companies: snapshot.companies,
+            chats: snapshot.chats,
+            messages: snapshot.messages,
+            agents: snapshot.agents,
+            approvals: snapshot.approvals,
+            selectedCompanyID: snapshot.selectedCompanyID,
+            selectedChatID: snapshot.selectedChatID
+        )
     }
 
     public static func seeded() -> CompanyWorkspaceStore {
@@ -357,8 +386,23 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
                 CompanyAgent(companyID: celeritech.id, name: "Teams Monitor", goal: "Watch all Teams chats with Claudia priority.", status: .running)
             ],
             approvals: [],
-            selectedCompanyID: celeritech.id
+            selectedCompanyID: celeritech.id,
+            selectedChatID: chats[0].id
         )
+    }
+
+    public static func loadOrSeed(databaseURL: URL = WorkspaceDatabase.defaultURL()) -> CompanyWorkspaceStore {
+        let database = WorkspaceDatabase(url: databaseURL)
+        if let snapshot = try? database.load() {
+            return CompanyWorkspaceStore(snapshot: snapshot)
+        }
+        let seeded = CompanyWorkspaceStore.seeded()
+        try? database.save(seeded.snapshot())
+        return seeded
+    }
+
+    public func persist(to databaseURL: URL = WorkspaceDatabase.defaultURL()) throws {
+        try WorkspaceDatabase(url: databaseURL).save(snapshot())
     }
 
     public func snapshot() -> WorkspaceSnapshot {
@@ -368,7 +412,8 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
             messages: chatMessages,
             agents: companyAgents,
             approvals: approvalRequests,
-            selectedCompanyID: selectedCompanyID
+            selectedCompanyID: selectedCompanyID,
+            selectedChatID: selectedChatID
         )
     }
 
@@ -382,6 +427,23 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
 
     public mutating func selectCompany(id: UUID) {
         selectedCompanyID = id
+        if let selectedChatID,
+           let chat = chats.first(where: { $0.id == selectedChatID }),
+           chat.companyID == id {
+            return
+        }
+        selectedChatID = chats.first { $0.companyID == id }?.id
+    }
+
+    public mutating func selectChat(id: UUID) {
+        selectedChatID = id
+        if let chat = chats.first(where: { $0.id == id }) {
+            selectedCompanyID = chat.companyID
+        }
+    }
+
+    public mutating func clearChatSelection() {
+        selectedChatID = nil
     }
 
     @discardableResult
@@ -389,6 +451,10 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         let companyID = chats.first { $0.id == chatID }?.companyID ?? selectedCompany?.id ?? Company.celeritechID
         let message = ChatMessage(companyID: companyID, chatID: chatID, sender: sender, body: body, status: status)
         chatMessages.append(message)
+        if let index = chats.firstIndex(where: { $0.id == chatID }) {
+            chats[index].lastMessage = body
+            chats[index].unreadCount = status == .received ? chats[index].unreadCount + 1 : 0
+        }
         return message
     }
 

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import HermesCore
 
@@ -82,4 +83,20 @@ import Testing
     #expect(store.messages(for: chatID).contains { $0.body.contains("CRM workflow") })
     #expect(approval.status == .pending)
     #expect(store.approvals(for: companyID).contains { $0.id == approval.id })
+}
+
+@Test func localDatabasePersistsSelectedChatAndMessages() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("hermes-workspace-\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    var store = CompanyWorkspaceStore.seeded()
+    let chatID = try #require(store.visibleChats.first?.id)
+    store.selectChat(id: chatID)
+    _ = store.addMessage(to: chatID, sender: "Edoardo", body: "Approved — proceed.", status: .sent)
+    try store.persist(to: url)
+
+    let reloaded = CompanyWorkspaceStore.loadOrSeed(databaseURL: url)
+    #expect(reloaded.selectedChatID == chatID)
+    #expect(reloaded.messages(for: chatID).contains { $0.body.contains("Approved") })
+    #expect(reloaded.chats.first { $0.id == chatID }?.lastMessage.contains("Approved") == true)
 }

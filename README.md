@@ -15,11 +15,12 @@ MVP goal: a Telegram-like workspace where chats are grouped by company, each com
 
 - Multi-company data model, seeded with Celeritech first.
 - Company profile with CEO, mission, operating notes, and approval rules.
+- Telegram-like company chat list + message thread with composer.
 - Company-scoped chat list with channel/kind metadata.
 - Messages and approval requests scoped to company + chat.
 - Agent structures per company.
 - Visual org chart/structure in SwiftUI.
-- Local-first JSON database codec for now; ready to move to SwiftData.
+- Local-first JSON workspace database (Application Support); ready to move to SwiftData.
 - iOS Xcode project generated from `project.yml`.
 
 ## Build

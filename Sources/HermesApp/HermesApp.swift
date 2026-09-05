@@ -5,11 +5,14 @@ import HermesCore
 
 @main
 struct HermesApp: App {
-    @State private var store = CompanyWorkspaceStore.seeded()
+    @State private var store = CompanyWorkspaceStore.loadOrSeed()
 
     var body: some Scene {
         WindowGroup {
             CompanyCommandCenterView(store: $store)
+                .onChange(of: store) { _, newValue in
+                    try? newValue.persist()
+                }
         }
     }
 }
@@ -21,9 +24,13 @@ struct CompanyCommandCenterView: View {
         NavigationSplitView {
             CompanySidebar(store: $store)
         } content: {
-            ChatListView(store: store)
+            ChatListView(store: $store)
         } detail: {
-            CompanyDetailView(store: $store)
+            if store.selectedChat != nil {
+                ChatThreadView(store: $store)
+            } else {
+                CompanyDetailView(store: $store)
+            }
         }
     }
 }
@@ -48,25 +55,126 @@ struct CompanySidebar: View {
 }
 
 struct ChatListView: View {
-    var store: CompanyWorkspaceStore
+    @Binding var store: CompanyWorkspaceStore
 
     var body: some View {
-        List(store.visibleChats) { chat in
-            HStack(spacing: 12) {
-                Circle().fill(chat.priority ? .orange : .blue).frame(width: 12, height: 12)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(chat.title).font(.headline)
-                    Text(chat.lastMessage).lineLimit(2).foregroundStyle(.secondary)
-                    Text(chat.channel.rawValue.uppercased()).font(.caption2).foregroundStyle(.tertiary)
+        List(selection: Binding(get: { store.selectedChatID }, set: { if let id = $0 { store.selectChat(id: id) } })) {
+            ForEach(store.visibleChats) { chat in
+                HStack(spacing: 12) {
+                    Circle().fill(chat.priority ? Color.orange : Color.accentColor).frame(width: 12, height: 12)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(chat.title).font(.headline)
+                            if chat.pinned {
+                                Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        Text(chat.lastMessage).lineLimit(2).foregroundStyle(.secondary)
+                        Text(chat.channel.rawValue.uppercased()).font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    if chat.unreadCount > 0 {
+                        Text("\(chat.unreadCount)")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.accentColor)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                    }
                 }
-                Spacer()
-                if chat.unreadCount > 0 {
-                    Text("\(chat.unreadCount)").font(.caption).padding(6).background(.blue).foregroundStyle(.white).clipShape(Capsule())
-                }
+                .padding(.vertical, 4)
+                .tag(chat.id)
             }
-            .padding(.vertical, 4)
         }
         .navigationTitle(store.selectedCompany?.name ?? "Chats")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Profile") {
+                    store.clearChatSelection()
+                }
+            }
+        }
+    }
+}
+
+struct ChatThreadView: View {
+    @Binding var store: CompanyWorkspaceStore
+    @State private var draft = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let chat = store.selectedChat {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 10) {
+                            ForEach(store.messages(for: chat.id)) { message in
+                                MessageBubble(message: message)
+                                    .id(message.id)
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .onChange(of: store.messages(for: chat.id).count) { _, _ in
+                        if let last = store.messages(for: chat.id).last {
+                            withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                        }
+                    }
+                }
+
+                Divider()
+
+                HStack(spacing: 10) {
+                    TextField("Message \(chat.title)", text: $draft, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .padding(10)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    Button {
+                        let body = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !body.isEmpty else { return }
+                        _ = store.addMessage(to: chat.id, sender: "Edoardo", body: body, status: .sent)
+                        draft = ""
+                    } label: {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title)
+                    }
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(12)
+            }
+        }
+        .navigationTitle(store.selectedChat?.title ?? "Chat")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+struct MessageBubble: View {
+    var message: ChatMessage
+
+    private var isOutgoing: Bool {
+        message.status == .sent || message.sender == "Edoardo"
+    }
+
+    var body: some View {
+        HStack {
+            if isOutgoing { Spacer(minLength: 48) }
+            VStack(alignment: isOutgoing ? .trailing : .leading, spacing: 4) {
+                if !isOutgoing {
+                    Text(message.sender).font(.caption2).foregroundStyle(.secondary)
+                }
+                Text(message.body)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(isOutgoing ? Color.accentColor : Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 16))
+                    .foregroundStyle(isOutgoing ? .white : .primary)
+                Text(message.status.rawValue)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            if !isOutgoing { Spacer(minLength: 48) }
+        }
     }
 }
 
@@ -81,6 +189,7 @@ struct CompanyDetailView: View {
                         Text(company.name).font(.largeTitle.bold())
                         Text(company.summary).foregroundStyle(.secondary)
                         Text("CEO: \(company.profile.ceoName)").font(.headline)
+                        Text(company.profile.mission).font(.subheadline)
                         Text(company.profile.operatingNotes).font(.caption).foregroundStyle(.secondary)
                         Text(company.profile.approvalRules).font(.caption.bold()).foregroundStyle(.blue)
                     }
