@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(HermesCore)
 import HermesCore
+#endif
 
 @main
 struct HermesApp: App {

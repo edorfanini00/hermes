@@ -1,0 +1,41 @@
+name: Hermes
+options:
+  bundleIdPrefix: com.edoardo
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0
+targets:
+  Hermes:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/HermesApp
+      - path: Sources/HermesCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.edoardo.hermes
+        INFOPLIST_KEY_CFBundleDisplayName: Hermes
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: Supporting/Info.plist
+      properties:
+        CFBundleDisplayName: Hermes
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+  HermesCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/HermesCoreTests
+    dependencies:
+      - target: Hermes
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.edoardo.hermes.tests
