@@ -243,7 +243,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             route = urlsplit(self.path)
             store = self.server.store
-            if self.headers.get_all('Host') != [f'127.0.0.1:{self.server.server_port}'] or self.headers.get('Origin') is not None or route.scheme or route.netloc:
+            allowed_hosts = {f'{h}:{self.server.server_port}' for h in ('127.0.0.1', *getattr(self.server, 'extra_hosts', ()))}
+            if len(self.headers.get_all('Host') or []) != 1 or self.headers.get('Host') not in allowed_hosts or self.headers.get('Origin') is not None or route.scheme or route.netloc:
                 raise APIError(403, 'forbidden')
             if self.command == 'GET' and self.path == '/health':
                 result = dict(status='ok', service='hermes-local', executionEnabled=False)

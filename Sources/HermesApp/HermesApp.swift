@@ -7,7 +7,11 @@ import HermesCore
 struct HermesApp: App {
     var body: some Scene {
         WindowGroup {
-            AuthenticatedConnectionView()
+            if CommandLine.arguments.contains("-hermesScreenshotRoot") {
+                ScreenshotRootHost()
+            } else {
+                AuthenticatedConnectionView()
+            }
         }
         .environment(\.colorScheme, .light)
     }
@@ -28,7 +32,13 @@ struct ScreenshotThreadRoot: View {
 
 struct HermesRootView: View {
     @Binding var store: CompanyWorkspaceStore
-    @State private var selectedTab = 2
+    @State private var selectedTab: Int = {
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "-hermesScreenshotTab"), i + 1 < args.count, let t = Int(args[i + 1]) {
+            return t
+        }
+        return 2
+    }()
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -90,7 +100,8 @@ struct ChatsHomeView: View {
                     }
                 }
             }
-            .navigationTitle("Chats")
+            .navigationTitle("")
+            .inlineNavigationTitle()
             .toolbar {
                 #if os(iOS)
                 ToolbarItem(placement: .topBarLeading) {
@@ -577,6 +588,7 @@ struct CompanyProfileView: View {
             }
             .background(HermesTheme.groupedCanvas.ignoresSafeArea())
             .navigationTitle("Company")
+            .inlineNavigationTitle()
             .hermesGlassChrome()
         }
     }
@@ -726,6 +738,8 @@ struct PlaceholderTab: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(HermesTheme.groupedCanvas.ignoresSafeArea())
             .navigationTitle(title)
+            .inlineNavigationTitle()
+            .hermesGlassChrome()
         }
     }
 }
@@ -747,4 +761,15 @@ extension View {
 #Preview("Thread") {
     @Previewable @State var store = CompanyWorkspaceStore.seeded()
     ChatThreadView(store: $store, chatID: store.visibleChats.first!.id)
+}
+
+struct ScreenshotRootHost: View {
+    @State private var store = CompanyWorkspaceStore.seeded()
+    var body: some View {
+        if CommandLine.arguments.contains("-hermesScreenshotThread") {
+            ScreenshotThreadRoot(store: $store)
+        } else {
+            HermesRootView(store: $store)
+        }
+    }
 }
