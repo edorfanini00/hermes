@@ -36,17 +36,22 @@ struct ScreenshotThreadRoot: View {
 
 struct HermesRootView: View {
     @Binding var store: CompanyWorkspaceStore
+    @State private var selectedTab = 2
 
     var body: some View {
-        TabView {
-            ChatsHomeView(store: $store)
-                .tabItem { Label("Chats", systemImage: "bubble.left.and.bubble.right.fill") }
-            CompanyProfileView(store: $store)
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+        TabView(selection: $selectedTab) {
             PlaceholderTab(title: "Contacts", icon: "person.2.fill", detail: "Company people, clients, and agents will live here.")
                 .tabItem { Label("Contacts", systemImage: "person.2") }
+                .tag(0)
             PlaceholderTab(title: "Calls", icon: "phone.fill", detail: "Future voice approvals and company calls.")
                 .tabItem { Label("Calls", systemImage: "phone") }
+                .tag(1)
+            ChatsHomeView(store: $store)
+                .tabItem { Label("Chats", systemImage: "bubble.left.and.bubble.right.fill") }
+                .tag(2)
+            CompanyProfileView(store: $store)
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(3)
         }
         .tint(HermesTheme.blue)
     }
@@ -95,6 +100,19 @@ struct ChatsHomeView: View {
             }
             .navigationTitle("Chats")
             .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Edit") { }
+                        .font(.system(size: 17))
+                        .foregroundStyle(HermesTheme.blue)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .foregroundStyle(HermesTheme.blue)
+                }
+                #else
                 ToolbarItem {
                     Button("Edit") { }
                         .font(.system(size: 17))
@@ -106,6 +124,7 @@ struct ChatsHomeView: View {
                     }
                     .foregroundStyle(HermesTheme.blue)
                 }
+                #endif
             }
             .hermesGlassChrome()
         }
@@ -119,6 +138,17 @@ struct HeaderChrome: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            HStack {
+                Text("Chats")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(.black)
+                Spacer()
+                Text(store.selectedCompany?.name ?? "Company")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(HermesTheme.muted)
+            }
+            .padding(.horizontal, 16)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(store.companies) { company in
@@ -352,9 +382,15 @@ struct ChatThreadView: View {
                     }
                 }
             }
+            #if os(iOS)
+            ToolbarItem(placement: .topBarTrailing) {
+                Image(systemName: "ellipsis.circle").foregroundStyle(HermesTheme.blue)
+            }
+            #else
             ToolbarItem {
                 Image(systemName: "ellipsis.circle").foregroundStyle(HermesTheme.blue)
             }
+            #endif
         }
         .inlineNavigationTitle()
         .hermesGlassChrome()
@@ -482,7 +518,7 @@ struct DateSeparator: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Color.black.opacity(0.18), in: Capsule())
+            .background(Color.black.opacity(0.38), in: Capsule())
             .padding(.vertical, 6)
     }
 }
@@ -494,8 +530,9 @@ struct ChatWallpaper: View {
             GeometryReader { proxy in
                 let width = proxy.size.width
                 let columns = max(Int(width / 46), 1)
+                let rows = max(Int(proxy.size.height / 46) + 2, 1)
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(46), spacing: 0), count: columns), spacing: 0) {
-                    ForEach(0..<180, id: \.self) { index in
+                    ForEach(0..<(rows * columns), id: \.self) { index in
                         Image(systemName: index.isMultiple(of: 3) ? "paperplane.fill" : "circle")
                             .font(.system(size: index.isMultiple(of: 3) ? 9 : 4))
                             .foregroundStyle(Color.white.opacity(0.18))
@@ -593,16 +630,29 @@ struct AgentBoard: View {
                         Text(agent.goal).font(.system(size: 13)).foregroundStyle(HermesTheme.muted).lineLimit(2)
                     }
                     Spacer()
-                    Text(agent.status.rawValue)
+                    Text(agent.status.telegramLabel)
                         .font(.system(size: 11, weight: .semibold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(HermesTheme.pillFill, in: Capsule())
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
         }
         .padding(16)
         .cardSurface()
+    }
+}
+
+private extension CompanyAgent.Status {
+    var telegramLabel: String {
+        switch self {
+        case .planning: "planning"
+        case .waitingForApproval: "waiting"
+        case .running: "running"
+        case .blocked: "blocked"
+        case .complete: "done"
+        }
     }
 }
 
