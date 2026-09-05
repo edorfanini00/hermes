@@ -5,17 +5,9 @@ import HermesCore
 
 @main
 struct HermesApp: App {
-    @State private var store = CompanyWorkspaceStore.loadOrSeed()
-
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--screenshot-thread") {
-                ScreenshotThreadRoot(store: $store)
-            } else if ProcessInfo.processInfo.arguments.contains("--screenshot-profile") {
-                CompanyProfileView(store: $store)
-            } else {
-                HermesRootView(store: $store)
-            }
+            AuthenticatedConnectionView()
         }
         .environment(\.colorScheme, .light)
     }

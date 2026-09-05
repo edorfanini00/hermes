@@ -1,15 +1,16 @@
-# Hermes
+# Helios Workspace
 
-Swift company command-center app for Edoardo/Celeritech.
+Swift company command-center app. Repository and build target retain the internal name `hermes`.
 
-MVP goal: a Telegram-like workspace where chats are grouped by company, each company has its CEO/profile, agents can be spawned per company, and the user can inspect a visual company structure before approving work.
+## Release status
 
-## Current company
+Active production-readiness work is tracked in [release gates](Supporting/RELEASE-GATES.md), [Apple requirements](Supporting/APPLE-REVIEW-CHECKLIST.md), and the [integration audit](Supporting/INTEGRATION-AUDIT.md). The original local UI was a seeded demonstration, not a live messaging or agent execution service. A local approval decision is not proof that work was executed.
 
-- Celeritech
-- CEO: Edoardo Orfanini
-- Manager priority: Claudia Ochoa
-- Approval interfaces: Telegram + iMessage
+Verified App Store Connect record: `6808881436`, name **Helios Workspace**, bundle `com.prismtrade.hermes`, Prismtrade LLC team `6833T8P572`. Existing IQONIC is separate. No build has been submitted for review.
+
+## Original demonstration scope
+
+The demo illustrates company-scoped chats, company profiles, agent records and approval concepts. Names, org hierarchy, CEO assignments and sample conversations in seed data are illustrative and are not a verified company directory.
 
 ## MVP scope
 

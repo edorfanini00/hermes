@@ -4,3 +4,21 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/
 xcuserdata/
 *.xcuserstate
+
+# Local credentials, pairing material and business data
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.mobileprovision
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+.venv/
+__pycache__/
+*.pyc
+backend/runtime/
+integration/runtime/
