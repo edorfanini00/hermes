@@ -167,14 +167,42 @@ public struct OrgEdge: Codable, Equatable, Sendable {
 }
 
 public struct CompanyChat: Identifiable, Codable, Equatable, Sendable {
-    public enum Channel: String, Codable, Sendable { case teams, email, asana, imessage, telegram, gohighlevel }
-    public enum Kind: String, Codable, Sendable { case general, approval, agent, project, direct }
+    public enum Channel: String, Codable, Sendable, CaseIterable {
+        case teams, email, asana, imessage, telegram, gohighlevel
+
+        public var displayName: String {
+            switch self {
+            case .teams: "Teams"
+            case .email: "Email"
+            case .asana: "Asana"
+            case .imessage: "iMessage"
+            case .telegram: "Telegram"
+            case .gohighlevel: "GoHighLevel"
+            }
+        }
+    }
+
+    public enum Kind: String, Codable, Sendable, CaseIterable {
+        case general, approval, agent, project, direct
+
+        public var displayName: String {
+            switch self {
+            case .general: "Group"
+            case .approval: "Approvals"
+            case .agent: "Agent"
+            case .project: "Project"
+            case .direct: "Direct"
+            }
+        }
+    }
+
     public var id: UUID
     public var companyID: UUID
     public var title: String
     public var channel: Channel
     public var kind: Kind
     public var lastMessage: String
+    public var lastMessageAt: Date?
     public var unreadCount: Int
     public var priority: Bool
     public var pinned: Bool
@@ -186,6 +214,7 @@ public struct CompanyChat: Identifiable, Codable, Equatable, Sendable {
         channel: Channel,
         kind: Kind = .general,
         lastMessage: String = "",
+        lastMessageAt: Date? = nil,
         unreadCount: Int = 0,
         priority: Bool = false,
         pinned: Bool = false
@@ -196,13 +225,63 @@ public struct CompanyChat: Identifiable, Codable, Equatable, Sendable {
         self.channel = channel
         self.kind = kind
         self.lastMessage = lastMessage
+        self.lastMessageAt = lastMessageAt
         self.unreadCount = unreadCount
         self.priority = priority
         self.pinned = pinned
     }
 
     public static func seed(companyID: UUID, title: String) -> CompanyChat {
-        CompanyChat(companyID: companyID, title: title, channel: .teams, lastMessage: "Ready for approval workflow.")
+        CompanyChat(companyID: companyID, title: title, channel: .teams, lastMessage: "Ready for approval workflow.", lastMessageAt: Date())
+    }
+}
+
+/// Telegram-style folder filter applied on top of the company-scoped chat list.
+public enum ChatFilter: String, CaseIterable, Codable, Sendable, Identifiable {
+    case all, direct, agents, approvals
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .all: "All Chats"
+        case .direct: "Direct"
+        case .agents: "Agents"
+        case .approvals: "Approvals"
+        }
+    }
+
+    public func matches(_ chat: CompanyChat) -> Bool {
+        switch self {
+        case .all: true
+        case .direct: chat.kind == .direct
+        case .agents: chat.kind == .agent
+        case .approvals: chat.kind == .approval
+        }
+    }
+}
+
+/// Deterministic helpers for avatar initials and colour selection.
+public enum NameFormatting {
+    public static func initials(for name: String) -> String {
+        let words = name
+            .split(whereSeparator: { $0.isWhitespace || $0 == "/" || $0 == "-" || $0 == "·" })
+            .map(String.init)
+            .filter { $0.contains { $0.isLetter || $0.isNumber } }
+        let letters = words.prefix(2).compactMap { word in
+            word.first { $0.isLetter || $0.isNumber }
+        }
+        if letters.isEmpty {
+            return "?"
+        }
+        return String(letters).uppercased()
+    }
+
+    /// Stable across launches (unlike `hashValue`) so avatars keep their colour.
+    public static func paletteIndex(for name: String, paletteCount: Int) -> Int {
+        guard paletteCount > 0 else { return 0 }
+        let sum = name.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7FFF_FFFF }
+        return sum % paletteCount
     }
 }
 
@@ -215,8 +294,19 @@ public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
     public var body: String
     public var status: Status
     public var createdAt: Date
+    /// Telegram-style quote reply: the message this one replies to, if any.
+    public var quotedMessageID: UUID?
 
-    public init(id: UUID = UUID(), companyID: UUID, chatID: UUID, sender: String, body: String, status: Status, createdAt: Date = Date()) {
+    public init(
+        id: UUID = UUID(),
+        companyID: UUID,
+        chatID: UUID,
+        sender: String,
+        body: String,
+        status: Status,
+        createdAt: Date = Date(),
+        quotedMessageID: UUID? = nil
+    ) {
         self.id = id
         self.companyID = companyID
         self.chatID = chatID
@@ -224,6 +314,14 @@ public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         self.body = body
         self.status = status
         self.createdAt = createdAt
+        self.quotedMessageID = quotedMessageID
+    }
+
+    /// Messages authored by the CEO (or already marked as sent) render as outgoing bubbles.
+    public func isOutgoing(ceoName: String) -> Bool {
+        if status == .sent { return true }
+        let first = ceoName.split(separator: " ").first.map(String.init) ?? ceoName
+        return sender == ceoName || sender == first
     }
 }
 
@@ -322,13 +420,36 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         return chats.first { $0.id == selectedChatID }
     }
 
+    /// Company-scoped chats: pinned first, then priority, then most recent activity.
     public var visibleChats: [CompanyChat] {
         guard let id = selectedCompany?.id else { return [] }
-        return chats.filter { $0.companyID == id }.sorted { lhs, rhs in
-            if lhs.priority != rhs.priority { return lhs.priority && !rhs.priority }
-            if lhs.pinned != rhs.pinned { return lhs.pinned && !rhs.pinned }
-            return lhs.title < rhs.title
+        return chats.filter { $0.companyID == id }.sorted(by: Self.chatOrder)
+    }
+
+    public var pinnedChats: [CompanyChat] { visibleChats.filter(\.pinned) }
+    public var regularChats: [CompanyChat] { visibleChats.filter { !$0.pinned } }
+
+    public func visibleChats(matching filter: ChatFilter, search: String = "") -> [CompanyChat] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return visibleChats.filter { chat in
+            guard filter.matches(chat) else { return false }
+            guard !query.isEmpty else { return true }
+            return chat.title.localizedCaseInsensitiveContains(query)
+                || chat.lastMessage.localizedCaseInsensitiveContains(query)
         }
+    }
+
+    public func unreadCount(matching filter: ChatFilter = .all) -> Int {
+        visibleChats(matching: filter).reduce(0) { $0 + $1.unreadCount }
+    }
+
+    private static func chatOrder(_ lhs: CompanyChat, _ rhs: CompanyChat) -> Bool {
+        if lhs.pinned != rhs.pinned { return lhs.pinned }
+        if lhs.priority != rhs.priority { return lhs.priority }
+        let lhsDate = lhs.lastMessageAt ?? .distantPast
+        let rhsDate = rhs.lastMessageAt ?? .distantPast
+        if lhsDate != rhsDate { return lhsDate > rhsDate }
+        return lhs.title < rhs.title
     }
 
     public init(
@@ -361,33 +482,173 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         )
     }
 
-    public static func seeded() -> CompanyWorkspaceStore {
+    public static func seeded(now: Date = Date()) -> CompanyWorkspaceStore {
         let celeritech = Company.celeritech()
-        let chats = [
-            CompanyChat(companyID: celeritech.id, title: "Claudia / Management", channel: .teams, kind: .approval, lastMessage: "Work requests become approval plans before action.", unreadCount: 0, priority: true, pinned: true),
-            CompanyChat(companyID: celeritech.id, title: "All Teams", channel: .teams, kind: .general, lastMessage: "282 chats + 79 channels monitored.", unreadCount: 0),
-            CompanyChat(companyID: celeritech.id, title: "Asana Video Reviews", channel: .asana, kind: .project, lastMessage: "New reviews ping Telegram + iMessage.", unreadCount: 0),
-            CompanyChat(companyID: celeritech.id, title: "GoHighLevel CRM", channel: .gohighlevel, kind: .project, lastMessage: "CRM answers use the GHL dashboard/operator map.", unreadCount: 0)
-        ]
-        let seedMessage = ChatMessage(
+        let minute: TimeInterval = 60
+        let hour: TimeInterval = 3600
+        let day: TimeInterval = 86_400
+
+        let management = CompanyChat(
             companyID: celeritech.id,
-            chatID: chats[0].id,
-            sender: "Hermes",
-            body: "Celeritech workspace is ready. Claudia requests require approval before action.",
-            status: .received
+            title: "Claudia / Management",
+            channel: .teams,
+            kind: .approval,
+            lastMessage: "Draft plan ready — approve to re-trigger the two stalled follow-ups and reply to Claudia.",
+            lastMessageAt: now.addingTimeInterval(-12 * minute),
+            unreadCount: 1,
+            priority: true,
+            pinned: true
         )
+        let claudiaDirect = CompanyChat(
+            companyID: celeritech.id,
+            title: "Claudia Ochoa",
+            channel: .imessage,
+            kind: .direct,
+            lastMessage: "Ping me on iMessage when the plan is ready 🙏",
+            lastMessageAt: now.addingTimeInterval(-47 * minute),
+            unreadCount: 1,
+            pinned: true
+        )
+        let agents = CompanyChat(
+            companyID: celeritech.id,
+            title: "Hermes Agents",
+            channel: .telegram,
+            kind: .agent,
+            lastMessage: "CRM Agent finished planning. Waiting for approval.",
+            lastMessageAt: now.addingTimeInterval(-2 * hour),
+            unreadCount: 2
+        )
+        let allTeams = CompanyChat(
+            companyID: celeritech.id,
+            title: "All Teams",
+            channel: .teams,
+            kind: .general,
+            lastMessage: "282 chats + 79 channels monitored.",
+            lastMessageAt: now.addingTimeInterval(-5 * hour)
+        )
+        let asana = CompanyChat(
+            companyID: celeritech.id,
+            title: "Asana Video Reviews",
+            channel: .asana,
+            kind: .project,
+            lastMessage: "New reviews ping Telegram + iMessage.",
+            lastMessageAt: now.addingTimeInterval(-1 * day - 3 * hour)
+        )
+        let crm = CompanyChat(
+            companyID: celeritech.id,
+            title: "GoHighLevel CRM",
+            channel: .gohighlevel,
+            kind: .project,
+            lastMessage: "CRM answers use the GHL dashboard/operator map.",
+            lastMessageAt: now.addingTimeInterval(-3 * day)
+        )
+        let chats = [management, claudiaDirect, agents, allTeams, asana, crm]
+
+        let claudiaAsk = ChatMessage(
+            companyID: celeritech.id,
+            chatID: management.id,
+            sender: "Claudia Ochoa",
+            body: "Can you check the GoHighLevel workflow for the new video review leads? Two of them didn't get the follow-up email.",
+            status: .received,
+            createdAt: now.addingTimeInterval(-1 * day - 2 * hour)
+        )
+        let messages = [
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: management.id,
+                sender: "Hermes",
+                body: "Celeritech workspace is ready. Claudia requests require approval before action.",
+                status: .received,
+                createdAt: now.addingTimeInterval(-2 * day - 4 * hour)
+            ),
+            claudiaAsk,
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: management.id,
+                sender: "Edoardo",
+                body: "On it — Hermes will draft a plan first and I'll approve before anything moves in the CRM.",
+                status: .sent,
+                createdAt: now.addingTimeInterval(-1 * day - 1 * hour - 40 * minute),
+                quotedMessageID: claudiaAsk.id
+            ),
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: management.id,
+                sender: "Hermes",
+                body: "Draft plan ready — approve to re-trigger the two stalled follow-ups and reply to Claudia.",
+                status: .pendingApproval,
+                createdAt: now.addingTimeInterval(-12 * minute)
+            ),
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: claudiaDirect.id,
+                sender: "Claudia Ochoa",
+                body: "Ping me on iMessage when the plan is ready 🙏",
+                status: .received,
+                createdAt: now.addingTimeInterval(-47 * minute)
+            ),
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: agents.id,
+                sender: "Teams Monitor",
+                body: "Watching 282 chats. Claudia flagged as priority.",
+                status: .received,
+                createdAt: now.addingTimeInterval(-3 * hour)
+            ),
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: agents.id,
+                sender: "CRM Agent",
+                body: "CRM Agent finished planning. Waiting for approval.",
+                status: .received,
+                createdAt: now.addingTimeInterval(-2 * hour)
+            ),
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: allTeams.id,
+                sender: "Hermes",
+                body: "282 chats + 79 channels monitored.",
+                status: .received,
+                createdAt: now.addingTimeInterval(-5 * hour)
+            ),
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: asana.id,
+                sender: "Hermes",
+                body: "New reviews ping Telegram + iMessage.",
+                status: .received,
+                createdAt: now.addingTimeInterval(-1 * day - 3 * hour)
+            ),
+            ChatMessage(
+                companyID: celeritech.id,
+                chatID: crm.id,
+                sender: "Hermes",
+                body: "CRM answers use the GHL dashboard/operator map.",
+                status: .received,
+                createdAt: now.addingTimeInterval(-3 * day)
+            )
+        ]
+
         return CompanyWorkspaceStore(
             companies: [celeritech],
             chats: chats,
-            messages: [seedMessage],
+            messages: messages,
             agents: [
                 CompanyAgent(companyID: celeritech.id, name: "Approval Router", goal: "Send pings to Telegram and iMessage, wait for approval.", status: .waitingForApproval),
                 CompanyAgent(companyID: celeritech.id, name: "CRM Agent", goal: "Answer GHL/CRM questions when known, after approval.", status: .planning),
                 CompanyAgent(companyID: celeritech.id, name: "Teams Monitor", goal: "Watch all Teams chats with Claudia priority.", status: .running)
             ],
-            approvals: [],
+            approvals: [
+                ApprovalRequest(
+                    companyID: celeritech.id,
+                    chatID: management.id,
+                    title: "Re-trigger video review follow-ups",
+                    proposedAction: "Audit the “Video Review Follow-up” workflow in GoHighLevel, re-trigger the two stalled contacts, then reply to Claudia in Teams.",
+                    createdAt: now.addingTimeInterval(-12 * minute)
+                )
+            ],
             selectedCompanyID: celeritech.id,
-            selectedChatID: chats[0].id
+            selectedChatID: management.id
         )
     }
 
@@ -446,13 +707,42 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         selectedChatID = nil
     }
 
+    public mutating func markChatRead(id: UUID) {
+        guard let index = chats.firstIndex(where: { $0.id == id }) else { return }
+        chats[index].unreadCount = 0
+    }
+
+    public mutating func setPinned(chatID: UUID, _ pinned: Bool) {
+        guard let index = chats.firstIndex(where: { $0.id == chatID }) else { return }
+        chats[index].pinned = pinned
+    }
+
+    public mutating func togglePinned(chatID: UUID) {
+        guard let chat = chats.first(where: { $0.id == chatID }) else { return }
+        setPinned(chatID: chatID, !chat.pinned)
+    }
+
     @discardableResult
-    public mutating func addMessage(to chatID: UUID, sender: String, body: String, status: ChatMessage.Status = .received) -> ChatMessage {
+    public mutating func addMessage(
+        to chatID: UUID,
+        sender: String,
+        body: String,
+        status: ChatMessage.Status = .received,
+        quoting quotedMessageID: UUID? = nil
+    ) -> ChatMessage {
         let companyID = chats.first { $0.id == chatID }?.companyID ?? selectedCompany?.id ?? Company.celeritechID
-        let message = ChatMessage(companyID: companyID, chatID: chatID, sender: sender, body: body, status: status)
+        let message = ChatMessage(
+            companyID: companyID,
+            chatID: chatID,
+            sender: sender,
+            body: body,
+            status: status,
+            quotedMessageID: quotedMessageID
+        )
         chatMessages.append(message)
         if let index = chats.firstIndex(where: { $0.id == chatID }) {
             chats[index].lastMessage = body
+            chats[index].lastMessageAt = message.createdAt
             chats[index].unreadCount = status == .received ? chats[index].unreadCount + 1 : 0
         }
         return message
@@ -462,6 +752,10 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         chatMessages.filter { $0.chatID == chatID }.sorted { $0.createdAt < $1.createdAt }
     }
 
+    public func message(id: UUID) -> ChatMessage? {
+        chatMessages.first { $0.id == id }
+    }
+
     @discardableResult
     public mutating func requestApproval(companyID: UUID, chatID: UUID?, title: String, proposedAction: String) -> ApprovalRequest {
         let request = ApprovalRequest(companyID: companyID, chatID: chatID, title: title, proposedAction: proposedAction)
@@ -469,8 +763,19 @@ public struct CompanyWorkspaceStore: Equatable, Sendable {
         return request
     }
 
+    public mutating func resolveApproval(id: UUID, status: ApprovalRequest.Status) {
+        guard let index = approvalRequests.firstIndex(where: { $0.id == id }) else { return }
+        approvalRequests[index].status = status
+    }
+
     public func approvals(for companyID: UUID) -> [ApprovalRequest] {
         approvalRequests.filter { $0.companyID == companyID }.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    public func pendingApprovals(forChat chatID: UUID) -> [ApprovalRequest] {
+        approvalRequests
+            .filter { $0.chatID == chatID && $0.status == .pending }
+            .sorted { $0.createdAt < $1.createdAt }
     }
 
     @discardableResult

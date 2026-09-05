@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		7B42972430A32313A21C9262 /* HermesCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFC2539618C6FF9FAFD8D89 /* HermesCoreTests.swift */; };
+		A8BFBD42ECEC803D6A504295 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A3FDDD8FD79649A5C0B04B /* Theme.swift */; };
 		DE9F40C8B9C86E68E7F851F8 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3733563F2C4CAC1C157536EF /* Models.swift */; };
 		EADC512BE80FB863F3546F17 /* HermesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A64E2D7C10206741E4308E8 /* HermesApp.swift */; };
 /* End PBXBuildFile section */
@@ -25,6 +26,7 @@
 /* Begin PBXFileReference section */
 		1A64E2D7C10206741E4308E8 /* HermesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesApp.swift; sourceTree = "<group>"; };
 		3733563F2C4CAC1C157536EF /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		56A3FDDD8FD79649A5C0B04B /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		6CDAD721460ADCBB56CBF826 /* Hermes.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Hermes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BCFC2539618C6FF9FAFD8D89 /* HermesCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesCoreTests.swift; sourceTree = "<group>"; };
 		BE4B702A7DCB9A3873578CA7 /* HermesCoreTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HermesCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -72,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				1A64E2D7C10206741E4308E8 /* HermesApp.swift */,
+				56A3FDDD8FD79649A5C0B04B /* Theme.swift */,
 			);
 			name = HermesApp;
 			path = Sources/HermesApp;
@@ -161,6 +164,7 @@
 			files = (
 				EADC512BE80FB863F3546F17 /* HermesApp.swift in Sources */,
 				DE9F40C8B9C86E68E7F851F8 /* Models.swift in Sources */,
+				A8BFBD42ECEC803D6A504295 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
