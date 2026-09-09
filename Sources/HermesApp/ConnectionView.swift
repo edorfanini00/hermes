@@ -95,6 +95,23 @@ private final class ConnectionModel {
         snapshot = workspace
         status = "Authenticated · last refresh \(Date().formatted(date: .omitted, time: .shortened))"
     }
+    func loadDemo() {
+        let store = CompanyWorkspaceStore.seeded()
+        snapshot = WorkspaceSnapshot(
+            companies: store.companies,
+            chats: store.chats,
+            messages: store.chatMessages,
+            agents: store.companyAgents,
+            approvals: store.approvalRequests,
+            selectedCompanyID: store.selectedCompanyID
+        )
+        status = "Demo Mode · read-only preview"
+        let demoID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
+        saved = SavedConnection(
+            server: "https://demo.helios.prismtrade.co",
+            pairing: ConnectionPairing(deviceToken: "demo", companyID: demoID)
+        )
+    }
     func disconnect() async {
         guard let saved else { return }
         busy = true; error = nil
@@ -302,6 +319,8 @@ private struct PairingScreen: View {
             .tint(HermesTheme.blue)
             .disabled(!canPair)
             .padding(.top, 18)
+
+            demoButton
         }
         .padding(18)
         .background(HermesTheme.canvas, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -310,6 +329,24 @@ private struct PairingScreen: View {
 
     private var canPair: Bool {
         !model.busy && !model.code.isEmpty && !model.server.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var demoButton: some View {
+        Button {
+            focus = nil
+            model.loadDemo()
+        } label: {
+            Text("Try Demo Mode")
+                .font(.system(size: 15, weight: .medium))
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .foregroundStyle(HermesTheme.blue)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(HermesTheme.blue.opacity(0.4), lineWidth: 1)
+                )
+        }
+        .padding(.top, 8)
     }
 
     private func field<Content: View>(icon: String, @ViewBuilder content: () -> Content) -> some View {
