@@ -131,6 +131,15 @@ private final class ConnectionModel {
         status = "Connection unavailable"
         self.error = error.localizedDescription
     }
+
+    // MARK: — Demo Mode (App Store Review / Guideline 2.1a)
+    // One-tap access to a synthetic review tenant on our hosted server.
+    // Server URL and code are public information included in the App Review Notes.
+    func loadDemo() async {
+        server = "https://witness-kate-yarn-periodic.trycloudflare.com"
+        code   = "PYtpj24KyfLnKHydxo8AKJCsyxqRTheEDCsBJmmJ9WA"
+        await pair()
+    }
 }
 
 struct AuthenticatedConnectionView: View {
@@ -346,6 +355,25 @@ private struct PairingScreen: View {
             .tint(HermesTheme.blue)
             .disabled(!canPair)
             .padding(.top, 18)
+
+            Button {
+                focus = nil
+                Task { await model.loadDemo() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "play.circle.fill")
+                    Text("Try Demo")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(HermesTheme.blue)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.roundedRectangle(radius: 12))
+            .tint(HermesTheme.blue)
+            .disabled(model.busy)
+            .padding(.top, 8)
         }
         .padding(18)
         .background(HermesTheme.canvas, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
