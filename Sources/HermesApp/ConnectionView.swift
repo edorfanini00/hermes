@@ -95,22 +95,19 @@ private final class ConnectionModel {
         snapshot = workspace
         status = "Authenticated · last refresh \(Date().formatted(date: .omitted, time: .shortened))"
     }
-    func loadDemo() {
-        let store = CompanyWorkspaceStore.seeded()
-        snapshot = WorkspaceSnapshot(
-            companies: store.companies,
-            chats: store.chats,
-            messages: store.chatMessages,
-            agents: store.companyAgents,
-            approvals: store.approvalRequests,
-            selectedCompanyID: store.selectedCompanyID
-        )
-        status = "Demo Mode · read-only preview"
-        let demoID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
-        saved = SavedConnection(
-            server: "https://demo.helios.prismtrade.co",
-            pairing: ConnectionPairing(deviceToken: "demo", companyID: demoID)
-        )
+    func decide(_ approval: ApprovalRequest, approve: Bool) async {
+        guard let saved else { return }
+        busy = true; error = nil
+        defer { busy = false }
+        do {
+            let client = try ConnectionClient(server: saved.server)
+            let result = try await client.decide(token: saved.pairing.deviceToken, approvalID: approval.id, approve: approve)
+            if var snap = snapshot, let i = snap.approvals.firstIndex(where: { $0.id == approval.id }) {
+                snap.approvals[i] = result.approval
+                snapshot = snap
+            }
+            status = "Decision recorded \(result.recordedAt.formatted(date: .omitted, time: .shortened)) · execution: \(result.executionStatus)"
+        } catch { fail(error) }
     }
     func disconnect() async {
         guard let saved else { return }
@@ -187,12 +184,32 @@ struct AuthenticatedConnectionView: View {
                         }
                         if workspace.chats.isEmpty { Text("No chats on this server.") }
                     }
-                    Section("Approval records · no execution") {
+                    Section("Agents") {
+                        ForEach(workspace.agents) { agent in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(agent.name).font(.headline)
+                                Text(agent.goal).font(.subheadline).foregroundStyle(.secondary)
+                                Text(agentStatusLabel(agent.status)).font(.caption).foregroundStyle(HermesTheme.blue)
+                            }
+                        }
+                        if workspace.agents.isEmpty { Text("No agents on this server.") }
+                    }
+                    Section("Approvals · decisions are recorded, nothing is executed") {
                         ForEach(workspace.approvals) { approval in
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 6) {
                                 Text(approval.title).font(.headline)
-                                Text(approval.proposedAction)
-                                Text("Recorded status: \(approval.status.rawValue)").font(.caption)
+                                Text(approval.proposedAction).font(.subheadline)
+                                Text("Status: \(approval.status.rawValue)").font(.caption).foregroundStyle(.secondary)
+                                if approval.status == .pending {
+                                    HStack(spacing: 12) {
+                                        Button("Approve") { Task { await model.decide(approval, approve: true) } }
+                                            .buttonStyle(.borderedProminent)
+                                        Button("Reject", role: .destructive) { Task { await model.decide(approval, approve: false) } }
+                                            .buttonStyle(.bordered)
+                                    }
+                                    .disabled(model.busy)
+                                    .padding(.top, 2)
+                                }
                             }
                         }
                         if workspace.approvals.isEmpty { Text("No approval records.") }
@@ -206,6 +223,16 @@ struct AuthenticatedConnectionView: View {
                 }
             }
             .navigationTitle("Helios Workspace")
+        }
+    }
+
+    private func agentStatusLabel(_ status: CompanyAgent.Status) -> String {
+        switch status {
+        case .planning: "Planning"
+        case .waitingForApproval: "Waiting for approval"
+        case .running: "Running"
+        case .blocked: "Blocked"
+        case .complete: "Complete"
         }
     }
 }
@@ -319,8 +346,6 @@ private struct PairingScreen: View {
             .tint(HermesTheme.blue)
             .disabled(!canPair)
             .padding(.top, 18)
-
-            demoButton
         }
         .padding(18)
         .background(HermesTheme.canvas, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -329,24 +354,6 @@ private struct PairingScreen: View {
 
     private var canPair: Bool {
         !model.busy && !model.code.isEmpty && !model.server.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    private var demoButton: some View {
-        Button {
-            focus = nil
-            model.loadDemo()
-        } label: {
-            Text("Try Demo Mode")
-                .font(.system(size: 15, weight: .medium))
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .foregroundStyle(HermesTheme.blue)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(HermesTheme.blue.opacity(0.4), lineWidth: 1)
-                )
-        }
-        .padding(.top, 8)
     }
 
     private func field<Content: View>(icon: String, @ViewBuilder content: () -> Content) -> some View {

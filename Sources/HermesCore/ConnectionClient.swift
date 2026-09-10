@@ -59,6 +59,19 @@ public struct ConnectionClient: Sendable {
     public func pair(code: String) async throws -> ConnectionPairing {
         try await request("v1/pair", body: ["code": code])
     }
+    /// Records an approve/reject decision on the server. The server never executes work; it returns the updated record.
+    public func decide(token: String, approvalID: UUID, approve: Bool) async throws -> ApprovalDecision {
+        let key = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        return try await request("v1/approvals/\(approvalID.uuidString.lowercased())/decision", token: token,
+                                 body: ["decision": approve ? "approve" : "reject", "idempotencyKey": key])
+    }
+}
+
+public struct ApprovalDecision: Codable, Sendable {
+    public let approval: ApprovalRequest
+    public let decisionID: UUID
+    public let recordedAt: Date
+    public let executionStatus: String
 }
 
 private final class ConnectionRedirectGuard: NSObject, URLSessionTaskDelegate, Sendable {

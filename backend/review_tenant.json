@@ -1,0 +1,381 @@
+{
+ "company": {
+  "id": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+  "name": "Northwind Logistics (Review Tenant)",
+  "ceo": {
+   "id": "cfe4b896-627e-5bae-a07d-ed9e37d254fc",
+   "name": "Dana Whitfield",
+   "role": "Chief Executive Officer",
+   "email": "dana@northwind.example"
+  },
+  "profile": {
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "ceoName": "Dana Whitfield",
+   "ceoTitle": "Chief Executive Officer",
+   "mission": "Regional freight and warehousing. Synthetic review tenant for App Store review. No real people, customers or data.",
+   "operatingNotes": "Elara aggregates the company's Teams, email and Asana activity into one command center. AI agents draft work; every external action needs a human approval recorded in the ledger.",
+   "approvalRules": "Explicit approval required before any external action. Execution is disabled in this review tenant."
+  },
+  "summary": "Synthetic demo organization with sample chats, agents and pending approvals.",
+  "orgNodes": [
+   {
+    "id": "fa8afa5c-5043-51e8-a4c4-93b9b865fd2b",
+    "title": "CEO",
+    "person": "Dana Whitfield"
+   },
+   {
+    "id": "8081fb12-448a-5fe1-90ab-63c443648041",
+    "title": "COO",
+    "person": "Marcus Lee"
+   },
+   {
+    "id": "81f3bbce-21ff-5f53-9116-a1c9fd0b86be",
+    "title": "CFO",
+    "person": "Priya Natarajan"
+   },
+   {
+    "id": "dc32a12c-fcf1-5899-8c95-70c648c899da",
+    "title": "Head of Operations",
+    "person": "Tom Becker"
+   },
+   {
+    "id": "d40e8206-d4a0-5b8b-ba8c-1f387ce92103",
+    "title": "Head of Sales",
+    "person": "Elena Ruiz"
+   }
+  ],
+  "orgEdges": [
+   {
+    "parentTitle": "CEO",
+    "childTitle": "COO"
+   },
+   {
+    "parentTitle": "CEO",
+    "childTitle": "CFO"
+   },
+   {
+    "parentTitle": "COO",
+    "childTitle": "Head of Operations"
+   },
+   {
+    "parentTitle": "COO",
+    "childTitle": "Head of Sales"
+   }
+  ]
+ },
+ "chats": [
+  {
+   "id": "0aa10d98-01a5-5dcd-9014-98b5b2e7bdcb",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Leadership",
+   "channel": "teams",
+   "kind": "general",
+   "lastMessage": "Marcus: Q4 warehouse lease renewal is on the agenda for Thursday.",
+   "lastMessageAt": "2026-09-10T00:44:48Z",
+   "unreadCount": 2,
+   "priority": false,
+   "pinned": true
+  },
+  {
+   "id": "0ab47c70-9efd-58c8-afbb-6c61d9bd3b19",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Operations daily",
+   "channel": "teams",
+   "kind": "general",
+   "lastMessage": "Tom: Dock 3 conveyor back online, 40 min downtime total.",
+   "lastMessageAt": "2026-09-10T00:21:48Z",
+   "unreadCount": 1,
+   "priority": false,
+   "pinned": false
+  },
+  {
+   "id": "0a7f4a8b-c523-516f-a650-32bbb8d447db",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Elena Ruiz",
+   "channel": "teams",
+   "kind": "direct",
+   "lastMessage": "Elena: Can you approve the Harbor Foods quote before 3pm?",
+   "lastMessageAt": "2026-09-10T00:48:48Z",
+   "unreadCount": 1,
+   "priority": true,
+   "pinned": false
+  },
+  {
+   "id": "042fbfe3-1324-5b6f-a759-8424578e277d",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Priya Natarajan",
+   "channel": "email",
+   "kind": "direct",
+   "lastMessage": "Priya: Attached the September cash flow summary.",
+   "lastMessageAt": "2026-09-09T22:56:48Z",
+   "unreadCount": 0,
+   "priority": false,
+   "pinned": false
+  },
+  {
+   "id": "251123fc-f46e-5d54-b763-d05fec61861c",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Invoice reconciliation agent",
+   "channel": "asana",
+   "kind": "agent",
+   "lastMessage": "Agent: 14 invoices matched, 2 flagged for review.",
+   "lastMessageAt": "2026-09-10T00:34:48Z",
+   "unreadCount": 1,
+   "priority": false,
+   "pinned": false
+  },
+  {
+   "id": "0e39912e-130a-5dfc-b89f-d2c8e81e3b61",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Customer outreach agent",
+   "channel": "email",
+   "kind": "agent",
+   "lastMessage": "Agent: Drafted 6 follow up emails, waiting for approval.",
+   "lastMessageAt": "2026-09-10T00:41:48Z",
+   "unreadCount": 1,
+   "priority": false,
+   "pinned": false
+  },
+  {
+   "id": "aea586c1-fa63-5d08-a3c1-ec474231c6cb",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Approvals",
+   "channel": "teams",
+   "kind": "approval",
+   "lastMessage": "2 actions waiting for your decision.",
+   "lastMessageAt": "2026-09-10T00:41:48Z",
+   "unreadCount": 2,
+   "priority": true,
+   "pinned": false
+  },
+  {
+   "id": "ea7ae7e3-afff-5716-a0a2-d8a58ed74a0d",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Fleet maintenance",
+   "channel": "asana",
+   "kind": "project",
+   "lastMessage": "Tom: Truck 17 service moved to Friday.",
+   "lastMessageAt": "2026-09-09T20:56:48Z",
+   "unreadCount": 0,
+   "priority": false,
+   "pinned": false
+  },
+  {
+   "id": "3560fff1-7a7f-58cd-a970-335007e5a91b",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "title": "Dana Whitfield",
+   "channel": "imessage",
+   "kind": "direct",
+   "lastMessage": "Dana: Great work on the Harbor Foods pitch.",
+   "lastMessageAt": "2026-09-09T19:56:48Z",
+   "unreadCount": 0,
+   "priority": false,
+   "pinned": false
+  }
+ ],
+ "messages": [
+  {
+   "id": "98187c75-4297-5718-926e-58772583855b",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0aa10d98-01a5-5dcd-9014-98b5b2e7bdcb",
+   "sender": "Dana Whitfield",
+   "body": "Team, quick reminder: board update is due end of month. I want the warehouse numbers in it.",
+   "status": "received",
+   "createdAt": "2026-09-09T23:26:48Z"
+  },
+  {
+   "id": "50a7279a-d087-5e48-998d-919b3a0126db",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0aa10d98-01a5-5dcd-9014-98b5b2e7bdcb",
+   "sender": "Priya Natarajan",
+   "body": "Cash flow summary is ready, sending it over now.",
+   "status": "received",
+   "createdAt": "2026-09-09T23:56:48Z"
+  },
+  {
+   "id": "3b739303-9949-514c-8484-880a4389dd99",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0aa10d98-01a5-5dcd-9014-98b5b2e7bdcb",
+   "sender": "Marcus Lee",
+   "body": "Q4 warehouse lease renewal is on the agenda for Thursday.",
+   "status": "received",
+   "createdAt": "2026-09-10T00:44:48Z"
+  },
+  {
+   "id": "7dbd9ee0-7864-53c4-a912-4813ac6c9154",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0ab47c70-9efd-58c8-afbb-6c61d9bd3b19",
+   "sender": "Tom Becker",
+   "body": "Dock 3 conveyor tripped this morning. Maintenance is on it.",
+   "status": "received",
+   "createdAt": "2026-09-09T23:41:48Z"
+  },
+  {
+   "id": "564b3d97-3b20-5e33-8f4a-679ea397bc80",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0ab47c70-9efd-58c8-afbb-6c61d9bd3b19",
+   "sender": "Tom Becker",
+   "body": "Dock 3 conveyor back online, 40 min downtime total.",
+   "status": "received",
+   "createdAt": "2026-09-10T00:21:48Z"
+  },
+  {
+   "id": "b9da8f7a-ae5b-5f00-a13a-abe518b638bb",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0a7f4a8b-c523-516f-a650-32bbb8d447db",
+   "sender": "Elena Ruiz",
+   "body": "Harbor Foods came back with a counter. They want net 45 instead of net 30.",
+   "status": "received",
+   "createdAt": "2026-09-10T00:16:48Z"
+  },
+  {
+   "id": "36b669fb-c248-58cf-bcc1-f32684396a97",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0a7f4a8b-c523-516f-a650-32bbb8d447db",
+   "sender": "You",
+   "body": "Fine on net 45 if volume commitment stays at 120 pallets a month.",
+   "status": "sent",
+   "createdAt": "2026-09-10T00:26:48Z"
+  },
+  {
+   "id": "410ea68e-ab9e-59b7-9be9-96256df5f15e",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0a7f4a8b-c523-516f-a650-32bbb8d447db",
+   "sender": "Elena Ruiz",
+   "body": "Can you approve the Harbor Foods quote before 3pm?",
+   "status": "received",
+   "createdAt": "2026-09-10T00:48:48Z"
+  },
+  {
+   "id": "781f1069-3937-5ce5-b4b8-293e1238d3d6",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "042fbfe3-1324-5b6f-a759-8424578e277d",
+   "sender": "Priya Natarajan",
+   "body": "Attached the September cash flow summary. Receivables are 6 days faster than August.",
+   "status": "received",
+   "createdAt": "2026-09-09T22:56:48Z"
+  },
+  {
+   "id": "031198e9-9574-5889-8c79-0c9a0237270d",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "251123fc-f46e-5d54-b763-d05fec61861c",
+   "sender": "Invoice reconciliation agent",
+   "body": "Started reconciliation for September. Pulling 16 invoices from Asana and the accounting export.",
+   "status": "received",
+   "createdAt": "2026-09-10T00:11:48Z"
+  },
+  {
+   "id": "b9662e26-ec08-571e-bb94-6ba1b09d557f",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "251123fc-f46e-5d54-b763-d05fec61861c",
+   "sender": "Invoice reconciliation agent",
+   "body": "14 invoices matched, 2 flagged for review. Flags: duplicate PO number on INV-2291, amount mismatch on INV-2304.",
+   "status": "received",
+   "createdAt": "2026-09-10T00:34:48Z"
+  },
+  {
+   "id": "8ed78e67-0d1d-55f4-a37c-bca9a4b318c0",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "0e39912e-130a-5dfc-b89f-d2c8e81e3b61",
+   "sender": "Customer outreach agent",
+   "body": "Drafted 6 follow up emails to accounts with no activity in 30 days. Nothing has been sent. Waiting for approval.",
+   "status": "pendingApproval",
+   "createdAt": "2026-09-10T00:41:48Z"
+  },
+  {
+   "id": "005c162a-b943-5417-b1ad-c5fb94b01285",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "ea7ae7e3-afff-5716-a0a2-d8a58ed74a0d",
+   "sender": "Tom Becker",
+   "body": "Truck 17 service moved to Friday, parts arrive Thursday.",
+   "status": "received",
+   "createdAt": "2026-09-09T20:56:48Z"
+  },
+  {
+   "id": "2f8d8181-1d35-522a-95ab-7869fb4ecf6b",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "3560fff1-7a7f-58cd-a970-335007e5a91b",
+   "sender": "Dana Whitfield",
+   "body": "Great work on the Harbor Foods pitch.",
+   "status": "received",
+   "createdAt": "2026-09-09T19:56:48Z"
+  },
+  {
+   "id": "0d7e6b3c-a4ca-5b58-8ee4-6d32e412e9bb",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": "3560fff1-7a7f-58cd-a970-335007e5a91b",
+   "sender": "You",
+   "body": "Thanks. Elena did most of the heavy lifting.",
+   "status": "sent",
+   "createdAt": "2026-09-09T20:01:48Z"
+  }
+ ],
+ "agents": [
+  {
+   "id": "17dcf87d-c90e-53cd-a039-88a5efb03a15",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "name": "Invoice reconciliation agent",
+   "goal": "Match September invoices to purchase orders and flag mismatches.",
+   "status": "running"
+  },
+  {
+   "id": "cd52c5ea-c02d-528a-9f63-1044d58f2b68",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "name": "Customer outreach agent",
+   "goal": "Draft follow up emails for accounts inactive 30+ days. Never send without approval.",
+   "status": "waitingForApproval"
+  },
+  {
+   "id": "ad8418c6-db60-59ed-bb5c-274b818b0b41",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "name": "Fleet scheduling agent",
+   "goal": "Keep truck maintenance schedule aligned with parts delivery dates.",
+   "status": "planning"
+  },
+  {
+   "id": "6357445e-19de-5ef2-99d2-ae947ffb5ebc",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "name": "Board deck agent",
+   "goal": "Assemble the monthly board update from finance and ops summaries.",
+   "status": "blocked"
+  }
+ ],
+ "approvals": [
+  {
+   "id": "285a2d2a-731d-554c-988c-5ddfe96e8b0c",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": null,
+   "title": "Send 6 customer follow up emails",
+   "proposedAction": "Customer outreach agent wants to send 6 drafted follow up emails to inactive accounts (Harbor Foods, Bluewater Grocers, Pinecrest Farms, Delta Packaging, Summit Retail, Orion Textiles).",
+   "status": "pending",
+   "createdAt": "2026-09-10T00:41:48Z"
+  },
+  {
+   "id": "f3c17907-3472-5c76-be37-10a3e0a8cb20",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": null,
+   "title": "Approve Harbor Foods quote at net 45",
+   "proposedAction": "Issue revised quote Q-1187 to Harbor Foods with net 45 payment terms and a 120 pallet monthly commitment.",
+   "status": "pending",
+   "createdAt": "2026-09-10T00:48:48Z"
+  },
+  {
+   "id": "9d03ba50-3abf-50c7-95b5-13ebefe631c4",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": null,
+   "title": "Reschedule Truck 17 service",
+   "proposedAction": "Move Truck 17 maintenance from Wednesday to Friday in Asana.",
+   "status": "approved",
+   "createdAt": "2026-09-09T20:46:48Z"
+  },
+  {
+   "id": "4d460944-2cba-549b-816b-f25d0b5a32df",
+   "companyID": "960f53c4-1f01-5027-a8e7-9bb5eedb1183",
+   "chatID": null,
+   "title": "Order replacement conveyor belt",
+   "proposedAction": "Purchase order for Dock 3 conveyor belt, $2,140.",
+   "status": "rejected",
+   "createdAt": "2026-09-09T18:16:48Z"
+  }
+ ]
+}

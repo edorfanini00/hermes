@@ -259,6 +259,41 @@ class HTTPTests(unittest.TestCase):
         with self.db.connect() as db:
             self.assertEqual(db.execute('SELECT count(*) FROM approvals').fetchone()[0],1)
 
+    def test_review_tenant_reusable_code_and_public_host(self):
+        tenant = json.loads((ROOT / 'review_tenant.json').read_text())
+        self.db.add_tenant(tenant)
+        cid = tenant['company']['id']
+        with self.assertRaises(ValueError):
+            self.db.create_pairing(cid, ttl=600)            # production codes stay <=5 min
+        with self.assertRaises(ValueError):
+            self.db.create_pairing(cid, ttl=91*86400, reusable=True)
+        code = self.db.create_pairing(cid, ttl=90*86400, reusable=True)
+        s1, p1 = self.request('/v1/pair', {'code': code})
+        s2, p2 = self.request('/v1/pair', {'code': code})
+        self.assertEqual((s1, s2), (200, 200))
+        self.assertNotEqual(p1['deviceToken'], p2['deviceToken'])
+        status, ws = self.request('/v1/workspace', token=p1['deviceToken'])
+        self.assertEqual(status, 200)
+        self.assertEqual(len(ws['messages']), len(tenant['messages']))
+        self.assertEqual(len(ws['agents']), len(tenant['agents']))
+        self.assertTrue(all(m['companyID'] == cid for m in ws['messages']))
+        # production single-use code still burns after one use
+        one = self.db.create_pairing(cid)
+        self.assertEqual(self.request('/v1/pair', {'code': one})[0], 200)
+        self.assertEqual(self.request('/v1/pair', {'code': one})[0], 401)
+        # reverse-proxied Host without a port is accepted only when configured
+        self.stop()
+        self.http = self.api.make_server(self.db, port=0, extra_hosts=['review.example'])
+        self.thread = threading.Thread(target=self.http.serve_forever, daemon=True); self.thread.start()
+        self.url = 'http://127.0.0.1:%s' % self.http.server_port
+        req = urllib.request.Request(self.url + '/health', headers={'Host': 'review.example'})
+        with urllib.request.urlopen(req, timeout=3) as res:
+            self.assertEqual(res.status, 200)
+        req = urllib.request.Request(self.url + '/health', headers={'Host': 'other.example'})
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req, timeout=3)
+        self.assertEqual(ctx.exception.code, 403)
+
     def test_graph_unknown_future_value_preserves_source_type(self):
         cid = self.provision()
         self.db.import_teams_metadata(cid,[{'id':'future-source','chatType':'unknownFutureValue','topic':None}])

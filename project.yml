@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: 6.0
     DEVELOPMENT_TEAM: 6833T8P572
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 4
+    CURRENT_PROJECT_VERSION: 6
     MARKETING_VERSION: 1.1
 targets:
   Hermes:
@@ -28,7 +28,7 @@ targets:
     info:
       path: Supporting/Info.plist
       properties:
-        CFBundleDisplayName: Hermes
+        CFBundleDisplayName: Helios
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft

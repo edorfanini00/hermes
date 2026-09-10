@@ -41,6 +41,8 @@ class Store:
             CREATE TABLE IF NOT EXISTS chats(id TEXT PRIMARY KEY, company_id TEXT NOT NULL REFERENCES companies(id), payload TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS provenance(record_id TEXT PRIMARY KEY REFERENCES chats(id), company_id TEXT NOT NULL REFERENCES companies(id), source TEXT NOT NULL, source_id TEXT NOT NULL, source_updated_at TEXT, imported_at TEXT NOT NULL, UNIQUE(company_id,source,source_id));
             CREATE TABLE IF NOT EXISTS approvals(id TEXT PRIMARY KEY, company_id TEXT NOT NULL REFERENCES companies(id), payload TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, company_id TEXT NOT NULL REFERENCES companies(id), chat_id TEXT NOT NULL REFERENCES chats(id), payload TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS agents(id TEXT PRIMARY KEY, company_id TEXT NOT NULL REFERENCES companies(id), payload TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS decisions(id TEXT PRIMARY KEY, approval_id TEXT UNIQUE NOT NULL REFERENCES approvals(id), session_id TEXT NOT NULL REFERENCES sessions(id), idempotency_key TEXT NOT NULL, decision TEXT NOT NULL CHECK(decision IN ('approve','reject')), recorded_at TEXT NOT NULL, request_hash TEXT NOT NULL, response TEXT NOT NULL, UNIQUE(session_id,idempotency_key));
             CREATE TRIGGER IF NOT EXISTS decisions_no_update BEFORE UPDATE ON decisions BEGIN SELECT RAISE(ABORT,'immutable audit'); END;
             CREATE TRIGGER IF NOT EXISTS decisions_no_delete BEFORE DELETE ON decisions BEGIN SELECT RAISE(ABORT,'immutable audit'); END;
@@ -48,6 +50,8 @@ class Store:
             db.execute('BEGIN IMMEDIATE')
             if 'source_chat_type' not in {row[1] for row in db.execute('PRAGMA table_info(provenance)')}:
                 db.execute('ALTER TABLE provenance ADD COLUMN source_chat_type TEXT')
+            if 'reusable' not in {row[1] for row in db.execute('PRAGMA table_info(pairing)')}:
+                db.execute('ALTER TABLE pairing ADD COLUMN reusable INTEGER NOT NULL DEFAULT 0')
 
     @contextmanager
     def connect(self):
@@ -87,12 +91,14 @@ class Store:
         with self.connect() as db:
             db.execute('INSERT INTO companies VALUES (?,?)', (company['id'], json.dumps(company)))
 
-    def create_pairing(self, company_id, ttl=300):
-        if not 0 < ttl <= 300:
-            raise ValueError('pairing TTL must be 1..300 seconds')
+    def create_pairing(self, company_id, ttl=300, reusable=False):
+        # Production codes: single use, <=5 min. Review codes (App Store reviewer tenant only): reusable, <=90 days.
+        limit = 90*86400 if reusable else 300
+        if not 0 < ttl <= limit:
+            raise ValueError('pairing TTL out of range')
         code = secrets.token_urlsafe(32)
         with self.connect() as db:
-            db.execute('INSERT INTO pairing(hash,company_id,expires) VALUES (?,?,?)', (digest(code), company_id, time.time()+ttl))
+            db.execute('INSERT INTO pairing(hash,company_id,expires,reusable) VALUES (?,?,?,?)', (digest(code), company_id, time.time()+ttl, 1 if reusable else 0))
         return code
 
     def pair(self, code):
@@ -103,8 +109,10 @@ class Store:
             row = db.execute('SELECT * FROM pairing WHERE hash=? AND used=0 AND expires>?', (digest(code), time.time())).fetchone()
             if row is None:
                 raise APIError(401, 'unauthorized')
-            token, sid, expires = secrets.token_urlsafe(32), str(uuid.uuid4()), time.time()+86400
-            db.execute('UPDATE pairing SET used=1 WHERE hash=?', (digest(code),))
+            token, sid = secrets.token_urlsafe(32), str(uuid.uuid4())
+            expires = time.time() + (30*86400 if row['reusable'] else 86400)
+            if not row['reusable']:
+                db.execute('UPDATE pairing SET used=1 WHERE hash=?', (digest(code),))
             db.execute('INSERT INTO sessions(id,hash,company_id,expires) VALUES (?,?,?,?)', (sid, digest(token), row['company_id'], expires))
             return dict(deviceToken=token, sessionID=sid, companyID=row['company_id'], expiresAt=stamp(expires))
 
@@ -156,6 +164,33 @@ class Store:
         with self.connect() as db:
             db.execute('INSERT INTO approvals VALUES (?,?,?)', (approval['id'], approval['companyID'], json.dumps(approval)))
 
+    def add_tenant(self, tenant):
+        """Insert a complete synthetic tenant from one JSON document (review/demo use)."""
+        self.add_company(tenant['company'])
+        cid = tenant['company']['id']
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            for chat in tenant.get('chats', []):
+                uuid.UUID(chat['id'])
+                if chat['companyID'] != cid:
+                    raise ValueError('chat scope mismatch')
+                db.execute('INSERT INTO chats VALUES (?,?,?)', (chat['id'], cid, json.dumps(chat)))
+            for m in tenant.get('messages', []):
+                uuid.UUID(m['id']); uuid.UUID(m['chatID'])
+                if m['companyID'] != cid:
+                    raise ValueError('message scope mismatch')
+                db.execute('INSERT INTO messages VALUES (?,?,?,?)', (m['id'], cid, m['chatID'], json.dumps(m)))
+            for a in tenant.get('agents', []):
+                uuid.UUID(a['id'])
+                if a['companyID'] != cid:
+                    raise ValueError('agent scope mismatch')
+                db.execute('INSERT INTO agents VALUES (?,?,?)', (a['id'], cid, json.dumps(a)))
+            for ap in tenant.get('approvals', []):
+                uuid.UUID(ap['id'])
+                if ap['companyID'] != cid or ap['status'] not in ('pending','approved','rejected','expired'):
+                    raise ValueError('approval scope mismatch')
+                db.execute('INSERT INTO approvals VALUES (?,?,?)', (ap['id'], cid, json.dumps(ap)))
+
     def scoped_approval(self, db, session, aid):
         row = db.execute('SELECT payload FROM approvals WHERE id=? AND company_id=?', (aid, session['company_id'])).fetchone()
         if row is None:
@@ -200,7 +235,9 @@ class Store:
             company = json.loads(db.execute('SELECT payload FROM companies WHERE id=?', (cid,)).fetchone()[0])
             approvals = [json.loads(r[0]) for r in db.execute('SELECT payload FROM approvals WHERE company_id=? ORDER BY id', (cid,))]
             chats = [json.loads(r[0]) for r in db.execute('SELECT payload FROM chats WHERE company_id=? ORDER BY id', (cid,))]
-        return dict(companies=[company], chats=chats, messages=[], agents=[], approvals=approvals, selectedCompanyID=cid, selectedChatID=None)
+            messages = [json.loads(r[0]) for r in db.execute('SELECT payload FROM messages WHERE company_id=? ORDER BY id', (cid,))]
+            agents = [json.loads(r[0]) for r in db.execute('SELECT payload FROM agents WHERE company_id=? ORDER BY id', (cid,))]
+        return dict(companies=[company], chats=chats, messages=messages, agents=agents, approvals=approvals, selectedCompanyID=cid, selectedChatID=None)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -243,7 +280,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             route = urlsplit(self.path)
             store = self.server.store
-            allowed_hosts = {f'{h}:{self.server.server_port}' for h in ('127.0.0.1', *getattr(self.server, 'extra_hosts', ()))}
+            # Loopback needs the port; a reverse-proxied public hostname (Cloudflare tunnel) arrives without one.
+            allowed_hosts = {f'127.0.0.1:{self.server.server_port}'} | set(getattr(self.server, 'extra_hosts', ()))
             if len(self.headers.get_all('Host') or []) != 1 or self.headers.get('Host') not in allowed_hosts or self.headers.get('Origin') is not None or route.scheme or route.netloc:
                 raise APIError(403, 'forbidden')
             if self.command == 'GET' and self.path == '/health':
@@ -305,9 +343,10 @@ class LocalServer(ThreadingHTTPServer):
             self.pair_attempts.append(now)
 
 
-def make_server(store, port=8766):
+def make_server(store, port=8766, extra_hosts=()):
     server = LocalServer(('127.0.0.1', port), Handler)
     server.store = store
+    server.extra_hosts = tuple(extra_hosts)
     return server
 
 
@@ -319,9 +358,12 @@ def main():
     commands = parser.add_subparsers(dest='command', required=True)
     serve = commands.add_parser('serve')
     serve.add_argument('--port', type=int, default=8766)
-    for command in ('add-company','add-approval'):
+    serve.add_argument('--public-host', action='append', default=[], help='Additional Host header value to accept (reverse proxy / tunnel hostname)')
+    for command in ('add-company','add-approval','add-tenant'):
         commands.add_parser(command).add_argument('file', type=pathlib.Path)
-    commands.add_parser('pair-code').add_argument('company_id')
+    pc = commands.add_parser('pair-code')
+    pc.add_argument('company_id')
+    pc.add_argument('--review', action='store_true', help='Reusable reviewer code, 90 day TTL. Only for a synthetic review tenant.')
     importer = commands.add_parser('import-teams-cache')
     importer.add_argument('company_id')
     importer.add_argument('file',type=pathlib.Path)
@@ -331,7 +373,7 @@ def main():
             parser.exit(2, 'Pair credentials require an interactive terminal; refusing redirected output.\n')
         store = Store(args.db)
         if args.command == 'serve':
-            server = make_server(store, args.port)
+            server = make_server(store, args.port, extra_hosts=args.public_host)
             print(f'Listening http://127.0.0.1:{server.server_port}', flush=True)
             try:
                 server.serve_forever()
@@ -340,13 +382,15 @@ def main():
             finally:
                 server.server_close()
         elif args.command == 'pair-code':
-            print(store.create_pairing(args.company_id))
+            print(store.create_pairing(args.company_id, ttl=90*86400 if args.review else 300, reusable=args.review))
         else:
             if args.file.stat().st_size > (16777216 if args.command == 'import-teams-cache' else 1048576):
                 raise ValueError('Input too large')
             data = json.loads(args.file.read_text())
             if args.command == 'import-teams-cache':
                 store.import_teams_metadata(args.company_id, data)
+            elif args.command == 'add-tenant':
+                store.add_tenant(data)
             else:
                 (store.add_company if args.command == 'add-company' else store.add_approval)(data)
             print('Record stored locally; no external action executed.')
