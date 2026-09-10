@@ -214,6 +214,10 @@ class Store:
                 if previous['request_hash'] != request_hash:
                     raise APIError(409, 'conflict')
                 return json.loads(previous['response'])
+            # Check if another session already decided this approval (approval_id is UNIQUE in decisions)
+            existing = db.execute('SELECT response FROM decisions WHERE approval_id=?', (aid,)).fetchone()
+            if existing:
+                raise APIError(409, 'conflict')
             if approval['status'] != 'pending':
                 raise APIError(409, 'conflict')
             approval['status'] = 'approved' if decision == 'approve' else 'rejected'
@@ -286,6 +290,17 @@ class Handler(BaseHTTPRequestHandler):
                 raise APIError(403, 'forbidden')
             if self.command == 'GET' and self.path == '/health':
                 result = dict(status='ok', service='hermes-local', executionEnabled=False)
+            elif self.command == 'GET' and self.path == '/demo.mp4':
+                video_path = pathlib.Path(__file__).parent.parent / 'site' / 'elara-demo.mp4'
+                if video_path.exists():
+                    data = video_path.read_bytes()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'video/mp4')
+                    self.send_header('Content-Length', str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                raise APIError(404, 'not_found')
             elif self.command == 'POST' and self.path == '/v1/pair':
                 self.server.check_pair_rate()
                 result = store.pair(self.body().get('code'))
