@@ -1,19 +1,24 @@
 name: iOS review checks
 on:
   pull_request:
-  push:
-    branches: [main, fix/app-review-pairing-readability]
   workflow_dispatch:
+concurrency:
+  group: ios-review-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -B -m unittest discover -s backend -v
   review:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Backend regression tests
-        run: python3 -B -m unittest discover -s backend -v
       - name: Generate iOS project
         run: |
           brew install xcodegen
