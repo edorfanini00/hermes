@@ -27,9 +27,17 @@ jobs:
       - name: Select iPad and iPhone simulators
         run: python3 scripts/select_simulators.py
       - name: iPad build, core and UI tests
-        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPAD_ID" -resultBundlePath artifacts/iPad.xcresult CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPAD_ID" -resultBundlePath artifacts/iPad.xcresult CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
       - name: iPhone UI tests
-        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPHONE_ID" -only-testing:HermesUITests -resultBundlePath artifacts/iPhone.xcresult CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPHONE_ID" -only-testing:HermesUITests -resultBundlePath artifacts/iPhone.xcresult CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
+      - name: Export UI screenshots
+        if: always()
+        run: |
+          for device in iPad iPhone; do
+            if [ -d "artifacts/$device.xcresult" ]; then
+              xcrun xcresulttool export attachments --path "artifacts/$device.xcresult" --output-path "artifacts/$device-screenshots"
+            fi
+          done
       - name: Keep test evidence
         if: always()
         uses: actions/upload-artifact@v4

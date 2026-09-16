@@ -5,6 +5,7 @@ final class PairingUITests: XCTestCase {
     func testURLOnlySubmissionExplainsMissingCode() throws {
         let app = XCUIApplication()
         app.launch()
+        XCTAssertFalse(app.alerts["Connection issue"].exists, "Unexpected startup error: \(app.alerts.debugDescription)")
         let server = app.textFields["Server URL"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         server.tap()
@@ -25,11 +26,12 @@ final class PairingUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         defer { XCUIDevice.shared.orientation = .portrait }
         app.launch()
+        XCTAssertFalse(app.alerts["Connection issue"].exists, "Unexpected startup error: \(app.alerts.debugDescription)")
         XCTAssertTrue(app.textFields["Server URL"].waitForExistence(timeout: 10))
         let pair = app.buttons["Pair securely"]
         for _ in 0..<6 {
             if pair.isHittable { break }
-            app.swipeUp()
+            app.scrollViews.firstMatch.swipeUp()
         }
         XCTAssertTrue(pair.isHittable)
         pair.tap()
