@@ -1,6 +1,10 @@
 import Foundation
 import Testing
+#if canImport(HermesCore)
 @testable import HermesCore
+#else
+@testable import Hermes
+#endif
 
 @Test func connectionPairContract() async throws {
     let client = try ConnectionClient(server: "https://example.com", transport: { request in

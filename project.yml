@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: 6.0
     DEVELOPMENT_TEAM: 6833T8P572
     CODE_SIGN_STYLE: Automatic
-    CURRENT_PROJECT_VERSION: 8
+    CURRENT_PROJECT_VERSION: 9
     MARKETING_VERSION: 1.1
 targets:
   Hermes:
@@ -21,14 +21,14 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.prismtrade.hermes
-        INFOPLIST_KEY_CFBundleDisplayName: Helios
+        INFOPLIST_KEY_CFBundleDisplayName: Elara
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: Supporting/Info.plist
       properties:
-        CFBundleDisplayName: Helios
+        CFBundleDisplayName: Elara
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -51,3 +51,20 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.prismtrade.hermes.tests
+
+  HermesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/HermesUITests
+    dependencies:
+      - target: Hermes
+schemes:
+  Hermes:
+    build:
+      targets:
+        Hermes: all
+    test:
+      targets:
+        - HermesCoreTests
+        - HermesUITests

@@ -1,0 +1,34 @@
+name: iOS review checks
+on:
+  pull_request:
+  push:
+    branches: [main, fix/app-review-pairing-readability]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend regression tests
+        run: python3 -B -m unittest discover -s backend -v
+      - name: Generate iOS project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -version
+      - name: Select iPad and iPhone simulators
+        run: python3 scripts/select_simulators.py
+      - name: iPad build, core and UI tests
+        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPAD_ID" -resultBundlePath artifacts/iPad.xcresult CODE_SIGNING_ALLOWED=NO
+      - name: iPhone UI tests
+        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPHONE_ID" -only-testing:HermesUITests -resultBundlePath artifacts/iPhone.xcresult CODE_SIGNING_ALLOWED=NO
+      - name: Keep test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-test-results
+          path: artifacts
+          if-no-files-found: ignore

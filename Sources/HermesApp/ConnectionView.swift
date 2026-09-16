@@ -4,12 +4,12 @@ import Security
 import HermesCore
 #endif
 
-private struct SavedConnection: Codable {
+struct SavedConnection: Codable {
     let server: String
     let pairing: ConnectionPairing
 }
 
-private enum ConnectionKeychain {
+enum ConnectionKeychain {
     static var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: "com.prismtrade.hermes.connection",
@@ -47,7 +47,7 @@ private enum ConnectionKeychain {
 }
 
 @MainActor @Observable
-private final class ConnectionModel {
+final class ConnectionModel {
     var server = ""
     var code = ""
     var snapshot: WorkspaceSnapshot?
@@ -55,9 +55,12 @@ private final class ConnectionModel {
     var error: String?
     var status = "Not connected"
     private var saved: SavedConnection?
+    private var didRestore = false
     var hasSession: Bool { saved != nil }
 
     func restore() async {
+        guard !didRestore else { return }
+        didRestore = true
         do {
             saved = try ConnectionKeychain.read()
             if let saved { server = saved.server; await refresh() }
@@ -79,7 +82,7 @@ private final class ConnectionModel {
         } catch { fail(error) }
     }
     func refresh() async {
-        guard let saved else { return }
+        guard !busy, let saved else { return }
         busy = true; error = nil
         defer { busy = false }
         do { try await load(saved) } catch { fail(error) }
@@ -98,7 +101,7 @@ private final class ConnectionModel {
         status = "Authenticated · last refresh \(Date().formatted(date: .omitted, time: .shortened))"
     }
     func decide(_ approval: ApprovalRequest, approve: Bool) async {
-        guard let saved else { return }
+        guard !busy, let saved else { return }
         busy = true; error = nil
         defer { busy = false }
         do {
@@ -112,7 +115,7 @@ private final class ConnectionModel {
         } catch { fail(error) }
     }
     func disconnect() async {
-        guard let saved else { return }
+        guard !busy, let saved else { return }
         busy = true; error = nil
         defer { busy = false }
         do {
@@ -128,10 +131,32 @@ private final class ConnectionModel {
             self.saved = nil; snapshot = nil; status = "Disconnected · session revoked"
         } catch { fail(error); status = "Revocation not confirmed · retry disconnect" }
     }
+    /// Erases only this device. Remote revocation must never be implied while offline.
+    func forgetDevice() {
+        guard !busy else { return }
+        do {
+            try ConnectionKeychain.remove()
+            saved = nil
+            snapshot = nil
+            code = ""
+            error = nil
+            status = "Device disconnected locally · remote session not revoked"
+        } catch { self.error = error.localizedDescription }
+    }
+
     private func fail(_ error: Error) {
         snapshot = nil
         status = "Connection unavailable"
         self.error = error.localizedDescription
+        if case ConnectionError.unauthorized = error, saved != nil {
+            do {
+                try ConnectionKeychain.remove()
+                saved = nil
+                status = "Session expired or revoked · pair again"
+            } catch {
+                self.error = "The session is no longer valid, but secure storage could not be cleared. Try removing this device again."
+            }
+        }
     }
 
 
@@ -139,6 +164,7 @@ private final class ConnectionModel {
 
 struct AuthenticatedConnectionView: View {
     @State private var model = ConnectionModel()
+    @State private var confirmForget = false
     var body: some View {
         Group {
             if model.hasSession {
@@ -149,6 +175,19 @@ struct AuthenticatedConnectionView: View {
         }
         .task { await model.restore() }
         .tint(HermesTheme.blue)
+        .alert("Connection issue", isPresented: Binding(
+            get: { model.error != nil },
+            set: { if !$0 { model.error = nil } }
+        )) {
+            Button("OK", role: .cancel) { model.error = nil }
+        } message: {
+            Text(model.error ?? "Please try again.")
+        }
+        .confirmationDialog("Remove this device without revoking its server session?", isPresented: $confirmForget, titleVisibility: .visible) {
+            Button("Remove from this device", role: .destructive) { model.forgetDevice() }
+        } message: {
+            Text("This clears the saved credential on this device. The server session stays valid until it expires or your operator revokes it.")
+        }
     }
 
     private var connectedView: some View {
@@ -205,11 +244,9 @@ struct AuthenticatedConnectionView: View {
                                 Text(approval.proposedAction).font(.subheadline)
                                 Text("Status: \(approval.status.rawValue)").font(.subheadline).foregroundStyle(.secondary)
                                 if approval.status == .pending {
-                                    HStack(spacing: 12) {
-                                        Button("Approve") { Task { await model.decide(approval, approve: true) } }
-                                            .buttonStyle(.borderedProminent)
-                                        Button("Reject", role: .destructive) { Task { await model.decide(approval, approve: false) } }
-                                            .buttonStyle(.bordered)
+                                    ViewThatFits(in: .horizontal) {
+                                      approvalButtons(approval, vertical: false)
+                                      approvalButtons(approval, vertical: true)
                                     }
                                     .disabled(model.busy)
                                     .padding(.top, 2)
@@ -223,10 +260,23 @@ struct AuthenticatedConnectionView: View {
                     Section {
                         Button("Refresh workspace") { Task { await model.refresh() } }
                         Button("Revoke session & disconnect", role: .destructive) { Task { await model.disconnect() } }
+                        if model.snapshot == nil {
+                            Button("Remove connection from this device", role: .destructive) { confirmForget = true }
+                        }
                     }.disabled(model.busy)
                 }
             }
             .navigationTitle("Elara")
+        }
+    }
+
+    private func approvalButtons(_ approval: ApprovalRequest, vertical: Bool) -> some View {
+        let layout = vertical ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
+            Button("Approve") { Task { await model.decide(approval, approve: true) } }
+                .buttonStyle(.borderedProminent)
+            Button("Reject", role: .destructive) { Task { await model.decide(approval, approve: false) } }
+                .buttonStyle(.bordered)
         }
     }
 
