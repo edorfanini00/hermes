@@ -295,6 +295,7 @@ struct AuthenticatedConnectionView: View {
 private struct PairingScreen: View {
     @Bindable var model: ConnectionModel
     @FocusState private var focus: Field?
+    @ScaledMetric(relativeTo: .body) private var fieldIconWidth: CGFloat = 24
     private enum Field { case server, code }
 
     var body: some View {
@@ -354,7 +355,7 @@ private struct PairingScreen: View {
 
             Text("Server URL").font(.headline).padding(.bottom, 8)
             field(icon: "server.rack") {
-                TextField("https://your-hermes-agent.example", text: $model.server)
+                TextField("Server URL", text: $model.server, prompt: Text("https://agent.example").foregroundStyle(HermesTheme.muted))
                     .accessibilityLabel("Server URL")
                     .disabled(model.busy)
                     .keyboardType(.URL)
@@ -368,7 +369,7 @@ private struct PairingScreen: View {
             Divider().padding(.vertical, 10)
             Text("Access code").font(.headline).padding(.bottom, 8)
             field(icon: "key.fill") {
-                SecureField("Access code from your Hermes agent", text: $model.code)
+                SecureField("Access code", text: $model.code, prompt: Text("Enter access code").foregroundStyle(HermesTheme.muted))
                     .accessibilityLabel("Access code")
                     .disabled(model.busy)
                     .focused($focus, equals: .code)
@@ -416,7 +417,7 @@ private struct PairingScreen: View {
             Image(systemName: icon)
                 .font(.body)
                 .foregroundStyle(HermesTheme.blue)
-                .frame(width: 24)
+                .frame(width: fieldIconWidth)
             content()
                 .font(.body)
                 .foregroundStyle(.black)

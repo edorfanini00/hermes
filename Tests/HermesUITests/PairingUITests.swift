@@ -37,7 +37,7 @@ final class PairingUITests: XCTestCase {
         pair.tap()
         XCTAssertTrue(app.alerts["Connection issue"].waitForExistence(timeout: 5))
         app.alerts["Connection issue"].buttons["OK"].tap()
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "Landscape accessibility text"
         attachment.lifetime = .keepAlways
         add(attachment)
