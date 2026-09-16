@@ -6,8 +6,8 @@ import HermesCore
 /// Hermes design tokens, tuned to sit close to Telegram iOS (light theme).
 enum HermesTheme {
     // Accent — one unmistakable blue.
-    static let blue = Color(hex: 0x229ED9)
-    static let deepBlue = Color(hex: 0x0088CC)
+    static let blue = Color(hex: 0x0066AD)
+    static let deepBlue = Color(hex: 0x005A99)
     static let lightBlue = Color(hex: 0x40A7E3)
 
     // Canvas + chrome.
@@ -17,8 +17,8 @@ enum HermesTheme {
     static let strongHairline = Color.black.opacity(0.14)
 
     // Text.
-    static let muted = Color(hex: 0x8E8E93)
-    static let subtle = Color(hex: 0xAEAEB2)
+    static let muted = Color(hex: 0x595963)
+    static let subtle = Color(hex: 0x62626C)
 
     // Fields / pills.
     static let fieldFill = Color(hex: 0x767680).opacity(0.12)

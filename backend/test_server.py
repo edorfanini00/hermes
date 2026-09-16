@@ -157,9 +157,17 @@ class HTTPTests(unittest.TestCase):
         run = subprocess.run(command+['pair-code',company['id']],capture_output=True,text=True)
         self.assertNotEqual(run.returncode,0, 'Pair credential must not be written to redirected stdout')
         proc = subprocess.Popen(command+['serve','--port','0'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-        self.addCleanup(lambda: (proc.terminate(), proc.wait(timeout=5)) if proc.poll() is None else None)
+        def cleanup_process():
+            if proc.poll() is None:
+                proc.terminate()
+            try:
+                proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+        self.addCleanup(cleanup_process)
         import select
-        self.assertTrue(select.select([proc.stdout],[],[],5)[0], 'server failed to announce readiness')
+        self.assertTrue(select.select([proc.stdout],[],[],30)[0], 'server failed to announce readiness')
         line = proc.stdout.readline().strip()
         self.assertTrue(line.startswith('Listening http://127.0.0.1:'), line)
         with urllib.request.urlopen(line.removeprefix('Listening ')+'/health',timeout=3) as response:

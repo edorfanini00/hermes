@@ -1,0 +1,54 @@
+name: iOS review checks
+on:
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ios-review-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -B -m unittest discover -s backend -v
+  review:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate iOS project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          xcodebuild -version
+      - name: Select iPad and iPhone simulators
+        run: python3 scripts/select_simulators.py
+      - name: iPad build, core and UI tests
+        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPAD_ID" -resultBundlePath artifacts/iPad.xcresult CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
+      - name: iPhone UI tests
+        run: xcodebuild test -project Hermes.xcodeproj -scheme Hermes -destination "platform=iOS Simulator,id=$IPHONE_ID" -only-testing:HermesUITests -resultBundlePath artifacts/iPhone.xcresult CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
+      - name: Export UI screenshots
+        if: always()
+        run: |
+          for device in iPad iPhone; do
+            if [ -d "artifacts/$device.xcresult" ]; then
+              xcrun xcresulttool export attachments --path "artifacts/$device.xcresult" --output-path "artifacts/$device-screenshots"
+            fi
+          done
+      - name: Keep test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-test-results
+          path: artifacts
+          if-no-files-found: ignore
+      - name: Keep UI screenshots separately
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-ui-screenshots
+          path: artifacts/*-screenshots
+          if-no-files-found: ignore
