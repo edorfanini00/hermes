@@ -36,3 +36,45 @@ import Testing
     #expect(throws: (any Error).self) { try ConnectionClient(server: "https://example.com/path?token=x") }
     #expect(try ConnectionClient(server: "https://example.com/").server.absoluteString == "https://example.com/")
 }
+
+@Test func missingPairingCodeDoesNotContactServer() async throws {
+    let client = try ConnectionClient(server: "https://example.com", transport: { _ in
+        Issue.record("An empty credential must never reach the network")
+        return (Data(), 500)
+    })
+    do {
+        _ = try await client.pair(code: " \n ")
+        Issue.record("Expected validation failure")
+    } catch ConnectionError.missingCode { }
+}
+
+@Test func pastedPairingInputIsTrimmed() async throws {
+    let client = try ConnectionClient(server: " \nhttps://example.com/\n", transport: { request in
+        #expect(String(data: request.httpBody!, encoding: .utf8) == "{\"code\":\"secret\"}")
+        return (Data(), 401)
+    })
+    do { _ = try await client.pair(code: " secret\n") }
+    catch ConnectionError.unauthorized { }
+}
+
+@Test func nonAPIResponseHasReadableError() async throws {
+    let client = try ConnectionClient(server: "https://example.com", transport: { _ in
+        (Data("<html>Server unavailable</html>".utf8), 200)
+    })
+    do {
+        _ = try await client.pair(code: "secret")
+        Issue.record("Expected invalid response")
+    } catch ConnectionError.invalidResponse { }
+}
+
+@Test func timeoutExplainsHowToRetry() async throws {
+    let client = try ConnectionClient(server: "https://example.com", transport: { _ in
+        throw URLError(.timedOut)
+    })
+    do {
+        _ = try await client.pair(code: "secret")
+        Issue.record("Expected timeout")
+    } catch {
+        #expect(error.localizedDescription.contains("try again"))
+    }
+}

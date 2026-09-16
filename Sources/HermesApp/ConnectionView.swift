@@ -64,11 +64,13 @@ private final class ConnectionModel {
         } catch { self.error = error.localizedDescription }
     }
     func pair() async {
+        guard !busy else { return }
         busy = true; error = nil; status = "Pairing…"
-        defer { busy = false; code = "" }
+        defer { busy = false }
         do {
             let client = try ConnectionClient(server: server.trimmingCharacters(in: .whitespacesAndNewlines))
             let pairing = try await client.pair(code: code)
+            code = ""
             let connection = SavedConnection(server: client.server.absoluteString, pairing: pairing)
             // Keep the in-memory credential if Keychain fails so revocation can still be attempted.
             saved = connection
@@ -132,14 +134,7 @@ private final class ConnectionModel {
         self.error = error.localizedDescription
     }
 
-    // MARK: — Demo Mode (App Store Review / Guideline 2.1a)
-    // One-tap access to a synthetic review tenant on our hosted server.
-    // Server URL and code are public information included in the App Review Notes.
-    func loadDemo() async {
-        server = "https://witness-kate-yarn-periodic.trycloudflare.com"
-        code   = "PYtpj24KyfLnKHydxo8AKJCsyxqRTheEDCsBJmmJ9WA"
-        await pair()
-    }
+
 }
 
 struct AuthenticatedConnectionView: View {
@@ -164,7 +159,7 @@ struct AuthenticatedConnectionView: View {
                         .font(.headline)
                     Text(model.status).font(.subheadline).foregroundStyle(.secondary)
                     Text("Read-only workspace. Approval decisions are records, not executed work. Sending messages and running agents are not available.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
                 if let error = model.error {
                     Section("Connection issue") { Text(error).foregroundStyle(.red) }
@@ -175,12 +170,12 @@ struct AuthenticatedConnectionView: View {
                         ForEach(workspace.chats) { chat in
                             NavigationLink {
                                 List {
-                                    Text("Server history · read only").font(.caption)
+                                    Text("Server history · read only").font(.subheadline)
                                     ForEach(workspace.messages.filter { $0.chatID == chat.id }) { message in
                                         VStack(alignment: .leading) {
                                             Text(message.sender).font(.headline)
                                             Text(message.body)
-                                            Text(message.createdAt.formatted()).font(.caption).foregroundStyle(.secondary)
+                                            Text(message.createdAt.formatted()).font(.subheadline).foregroundStyle(.secondary)
                                         }
                                     }
                                 }.navigationTitle(chat.title)
@@ -198,7 +193,7 @@ struct AuthenticatedConnectionView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(agent.name).font(.headline)
                                 Text(agent.goal).font(.subheadline).foregroundStyle(.secondary)
-                                Text(agentStatusLabel(agent.status)).font(.caption).foregroundStyle(HermesTheme.blue)
+                                Text(agentStatusLabel(agent.status)).font(.subheadline).foregroundStyle(HermesTheme.blue)
                             }
                         }
                         if workspace.agents.isEmpty { Text("No agents on this server.") }
@@ -208,7 +203,7 @@ struct AuthenticatedConnectionView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(approval.title).font(.headline)
                                 Text(approval.proposedAction).font(.subheadline)
-                                Text("Status: \(approval.status.rawValue)").font(.caption).foregroundStyle(.secondary)
+                                Text("Status: \(approval.status.rawValue)").font(.subheadline).foregroundStyle(.secondary)
                                 if approval.status == .pending {
                                     HStack(spacing: 12) {
                                         Button("Approve") { Task { await model.decide(approval, approve: true) } }
@@ -246,8 +241,7 @@ struct AuthenticatedConnectionView: View {
     }
 }
 
-/// Full-bleed pairing screen: gradient hero runs under the status bar so there is
-/// no empty nav-bar gap above the content.
+/// Scrollable onboarding with scalable text and a readable width on iPad.
 private struct PairingScreen: View {
     @Bindable var model: ConnectionModel
     @FocusState private var focus: Field?
@@ -256,34 +250,21 @@ private struct PairingScreen: View {
     var body: some View {
         ZStack(alignment: .top) {
             HermesTheme.groupedCanvas.ignoresSafeArea()
-            LinearGradient(colors: [HermesTheme.deepBlue, HermesTheme.blue, HermesTheme.lightBlue],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                .frame(height: 400)
-                .frame(maxWidth: .infinity)
-                .ignoresSafeArea(edges: .top)
 
             ScrollView {
                 VStack(spacing: 20) {
                     hero
                     formCard
-                    if let error = model.error {
-                        statusCard(icon: "exclamationmark.triangle.fill", tint: .red, title: "Connection issue", body: error)
-                    }
-                    if model.busy {
-                        HStack(spacing: 10) {
-                            ProgressView().tint(.white)
-                            Text("Contacting server…").foregroundStyle(.white)
-                        }
-                        .font(.subheadline)
-                    }
                     footer
                 }
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 32)
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .onTapGesture { focus = nil }
+
     }
 
     private var hero: some View {
@@ -295,31 +276,37 @@ private struct PairingScreen: View {
                     .foregroundStyle(.white)
             }
             Text("Elara")
-                .font(.system(size: 34, weight: .bold))
+                .font(.largeTitle.bold())
                 .foregroundStyle(.white)
             Text("Your Hermes agent, in your pocket")
-                .font(.system(size: 17))
-                .foregroundStyle(.white.opacity(0.9))
+                .font(.body)
+                .foregroundStyle(.white)
             Text(model.status)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(.white.opacity(0.18), in: Capsule())
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 28)
-        .padding(.bottom, 8)
+        .padding(.bottom, 24)
+        .padding(.horizontal, 20)
+        .multilineTextAlignment(.center)
+        .background(HermesTheme.deepBlue, in: RoundedRectangle(cornerRadius: 22))
     }
 
     private var formCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("CONNECT TO HERMES")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(HermesTheme.muted)
                 .padding(.bottom, 12)
 
+            Text("Server URL").font(.headline).padding(.bottom, 8)
             field(icon: "server.rack") {
                 TextField("https://your-hermes-agent.example", text: $model.server)
+                    .accessibilityLabel("Server URL")
+                    .disabled(model.busy)
                     .keyboardType(.URL)
                     .textContentType(.URL)
                     .textInputAutocapitalization(.never)
@@ -329,15 +316,20 @@ private struct PairingScreen: View {
                     .onSubmit { focus = .code }
             }
             Divider().padding(.vertical, 10)
+            Text("Access code").font(.headline).padding(.bottom, 8)
             field(icon: "key.fill") {
                 SecureField("Access code from your Hermes agent", text: $model.code)
+                    .accessibilityLabel("Access code")
+                    .disabled(model.busy)
                     .focused($focus, equals: .code)
                     .submitLabel(.go)
-                    .onSubmit { if canPair { Task { await model.pair() } } }
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit { Task { await model.pair() } }
             }
 
             Text("Enter your Hermes agent URL and the access code generated by your agent operator.")
-                .font(.footnote)
+                .font(.subheadline)
                 .foregroundStyle(HermesTheme.muted)
                 .padding(.top, 14)
 
@@ -345,64 +337,49 @@ private struct PairingScreen: View {
                 focus = nil
                 Task { await model.pair() }
             } label: {
-                Text("Pair securely")
-                    .font(.system(size: 17, weight: .semibold))
+                HStack {
+                    if model.busy { ProgressView().tint(.white) }
+                    Text(model.busy ? "Connecting…" : "Pair securely")
+                }
+                    .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 50)
+                    .frame(minHeight: 50)
             }
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.roundedRectangle(radius: 14))
             .tint(HermesTheme.blue)
-            .disabled(!canPair)
+            .disabled(model.busy)
             .padding(.top, 18)
 
-            Button {
-                focus = nil
-                Task { await model.loadDemo() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "play.circle.fill")
-                    Text("Try Demo")
-                }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(HermesTheme.blue)
-                .frame(maxWidth: .infinity)
-                .frame(height: 40)
+            if let error = model.error {
+                statusCard(icon: "exclamationmark.triangle.fill", tint: .red, title: "Could not connect", body: error)
+                    .padding(.top, 12)
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.roundedRectangle(radius: 12))
-            .tint(HermesTheme.blue)
-            .disabled(model.busy)
-            .padding(.top, 8)
         }
         .padding(18)
         .background(HermesTheme.canvas, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 18, y: 8)
     }
 
-    private var canPair: Bool {
-        !model.busy && !model.code.isEmpty && !model.server.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
     private func field<Content: View>(icon: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 17))
+                .font(.body)
                 .foregroundStyle(HermesTheme.blue)
                 .frame(width: 24)
             content()
-                .font(.system(size: 17))
+                .font(.body)
                 .foregroundStyle(.black)
         }
-        .frame(minHeight: 30)
+        .frame(minHeight: 44)
     }
 
     private func statusCard(icon: String, tint: Color, title: String, body: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon).foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.black)
-                Text(body).font(.footnote).foregroundStyle(HermesTheme.muted)
+                Text(title).font(.headline).foregroundStyle(.black)
+                Text(body).font(.subheadline).foregroundStyle(HermesTheme.muted)
             }
             Spacer(minLength: 0)
         }
@@ -413,9 +390,9 @@ private struct PairingScreen: View {
     private var footer: some View {
         VStack(spacing: 6) {
             Label("Read-only workspace", systemImage: "eye")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
             Text("Approval decisions are records, not executed work. Sending messages and running agents are not available.")
-                .font(.footnote)
+                .font(.subheadline)
                 .multilineTextAlignment(.center)
         }
         .foregroundStyle(HermesTheme.muted)
