@@ -45,3 +45,10 @@ jobs:
           name: review-test-results
           path: artifacts
           if-no-files-found: ignore
+      - name: Keep UI screenshots separately
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-ui-screenshots
+          path: artifacts/*-screenshots
+          if-no-files-found: ignore
